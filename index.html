@@ -71,7 +71,7 @@
 
   #title-bar {
     display: flex; align-items: center; gap: 8px;
-    padding: 6px 10px 6px 0;
+    padding: 6px 10px;
     background: var(--overlay-bg, rgba(15,26,40,0.88));
     border-radius: 0 8px 0 0;
     font-size: 13px;
@@ -161,7 +161,7 @@
 
     /* 叠加层适配 */
     #overlay { flex-direction: column; height: auto; min-height: auto; max-height: 40%; }
-    #title-bar { border-radius: 0; padding: 6px 10px 6px 0; }
+    #title-bar { border-radius: 0; padding: 6px 10px; }
     #title-bar .panel-title { margin: 0; }
     #data-panel { border-radius: 0; padding: 4px 10px 6px; }
     #data-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 25px; row-gap: 1px; }
@@ -267,12 +267,12 @@
 <div id="main">
   <div id="canvas-wrap"><canvas id="simCanvas"></canvas></div>
   <div id="overlay">
-    <div id="title-bar">
-      <button id="menu-btn" onclick="toggleDrawer()">☰</button>
-      <span>实时数据</span>
-      <span class="status-badge status-paused" id="statusBadge">已暂停</span>
-    </div>
     <div id="data-panel">
+      <div class="panel-title" style="display:flex;justify-content:flex-start;align-items:center;gap:8px;margin-bottom:6px">
+        <button id="menu-btn" onclick="toggleDrawer()">☰</button>
+        <span>实时数据</span>
+        <span class="status-badge status-paused" id="statusBadge">已暂停</span>
+      </div>
       <div id="data-grid">
         <div class="data-row"><span class="label">水流速度 v</span><span class="value" id="d_v" style="color:#00bcd4">0.1 m/s</span></div>
         <div class="data-row"><span class="label">状态</span><span class="value" id="d_status" style="color:#ffd740">—</span></div>
