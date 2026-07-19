@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>浮漂走水受力分析仿真</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "Microsoft YaHei", sans-serif; background: #1e2a3a; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; font-size: 14px; }
+
+  #sidebar { width: 300px; min-width: 300px; background: #1a2538; border-right: 1px solid #2a3a52; display: flex; flex-direction: column; overflow-y: auto; }
+  #sidebar::-webkit-scrollbar { width: 6px; }
+  #sidebar::-webkit-scrollbar-thumb { background: #2a3a52; border-radius: 3px; }
+
+  .panel-section { padding: 14px 16px; border-bottom: 1px solid #2a3a52; }
+  .panel-title { font-size: 14px; font-weight: 700; color: #e94560; margin-bottom: 10px; letter-spacing: 1px; }
+
+  .param-group { margin-bottom: 8px; }
+  .param-label { font-size: 13px; color: #8899aa; display: flex; justify-content: space-between; margin-bottom: 3px; }
+  .param-label span.val { color: #4fc3f7; font-weight: 600; }
+  .param-input { width: 100%; padding: 5px 8px; background: #0f1a28; border: 1px solid #2a3a52; color: #e0e0e0; border-radius: 4px; font-size: 13px; outline: none; }
+  .param-input:focus { border-color: #e94560; }
+
+  .data-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; border-bottom: 1px solid rgba(42,58,82,0.4); }
+  .data-row .label { color: #8899aa; }
+  .data-row .value { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  .controls { display: flex; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #2a3a52; }
+  .btn { flex: 1; padding: 8px 6px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; }
+  .btn-play { background: #4fc3f7; color: #1a2538; }
+  .btn-play.paused { background: #e94560; color: white; }
+  .btn-reset { background: #2a3a52; color: #e0e0e0; }
+
+  .theme-select { padding: 12px 16px 8px; border-bottom: 1px solid #2a3a52; }
+  .theme-select label { font-size: 13px; color: #8899aa; }
+  .theme-select select { width: 100%; margin-top: 5px; padding: 5px 8px; background: #0f1a28; border: 1px solid #2a3a52; color: #e0e0e0; border-radius: 4px; font-size: 13px; outline: none; cursor: pointer; }
+  .theme-select select:focus { border-color: #e94560; }
+
+  .speed-control { padding: 8px 16px; border-bottom: 1px solid #2a3a52; }
+  .speed-control label { font-size: 13px; color: #8899aa; }
+  .speed-control input[type=range] { width: 100%; margin-top: 4px; accent-color: #e94560; }
+
+  #main { flex: 1; position: relative; overflow: hidden; }
+  #canvas-wrap { position: absolute; inset: 0; background: #0f1a28; }
+  #simCanvas { width: 100%; height: 100%; display: block; }
+
+  /* ---- 水面上的叠加层 (数据+图表) ---- */
+  #overlay {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 26%; min-height: 110px;
+    display: flex; gap: 0;
+    pointer-events: none; /* 让画布交互穿透 */
+    z-index: 10;
+  }
+  #overlay > * { pointer-events: auto; } /* 子元素恢复交互 */
+
+  #data-panel {
+    width: 400px; min-width: 400px; padding: 8px 14px;
+    background: var(--overlay-bg, rgba(15,26,40,0.88));
+    border-radius: 0 0 8px 0;
+    display: flex; flex-direction: column;
+    font-size: 13px;
+  }
+  #data-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    column-gap: 25px; row-gap: 2px;
+  }
+  #data-grid .data-row {
+    padding: 2px 0; font-size: 12px; border-bottom: none;
+    display: flex; justify-content: space-between; gap: 6px;
+  }
+  #data-grid .data-row .label { white-space: nowrap; flex-shrink: 0; }
+  #data-grid .data-row .value { text-align: right; font-variant-numeric: tabular-nums; }
+  #data-panel .panel-title { font-size: 12px; margin-bottom: 4px; }
+  #data-panel .status-badge { margin-bottom: 4px; font-size: 10px; }
+
+  #chart-box {
+    flex: 1; position: relative; min-width: 300px;
+    background: var(--overlay-bg, rgba(13,27,42,0.88));
+    border-radius: 0 0 0 8px;
+    margin-left: 1px;
+  }
+  #chartCanvas { width: 100%; height: 100%; display: block; }
+
+  .legend { position: absolute; top: 3px; right: 6px; display: flex; flex-wrap: wrap; gap: 3px; }
+  .legend-item { display: flex; align-items: center; gap: 3px; padding: 2px 6px; border-radius: 3px; cursor: pointer; font-size: 11px; user-select: none; background: var(--legend-bg, rgba(10,22,40,0.85)); border: 1px solid transparent; color: var(--legend-text, #e0e0e0); }
+  .legend-item:hover { border-color: #2a3a52; }
+  .legend-item.hidden { opacity: 0.35; }
+  .legend-dot { width: 10px; height: 3px; border-radius: 2px; }
+
+  .status-badge { display: inline-block; padding: 2px 7px; border-radius: 8px; font-size: 11px; font-weight: 700; }
+  .status-running { background: #4fc3f733; color: #4fc3f7; }
+  .status-paused { background: #e9456033; color: #e94560; }
+
+  /* ---- 移动端切换按钮 ---- */
+  #mobile-tabs { display: none; }
+
+  @media (max-width: 768px) {
+    body { flex-direction: column; height: 100dvh; }
+
+    #mobile-tabs {
+      display: flex; gap: 0; background: #1a2538; border-bottom: 2px solid #2a3a52;
+    }
+    #mobile-tabs button {
+      flex: 1; padding: 10px 0; border: none; background: transparent;
+      color: #8899aa; font-size: 14px; font-weight: 600; cursor: pointer;
+      border-bottom: 3px solid transparent; transition: all 0.2s;
+    }
+    #mobile-tabs button.active {
+      color: #4fc3f7; border-bottom-color: #4fc3f7; background: rgba(79,195,247,0.06);
+    }
+
+    #sidebar {
+      width: 100%; min-width: 100%; max-height: none;
+      border-right: none; border-bottom: 1px solid #2a3a52;
+      flex: 1; overflow-y: auto;
+    }
+    #sidebar.hidden-mobile { display: none; }
+
+    #main { flex: 1; min-height: 0; }
+    #main.hidden-mobile { display: none; }
+
+    /* 竖屏: 数据在上，图表在下 */
+    #overlay { flex-direction: column; height: 26%; min-height: 120px; }
+    #data-panel {
+      width: 100%; min-width: unset; border-radius: 0;
+      flex-direction: row; flex-wrap: wrap; gap: 0 12px;
+      padding: 6px 10px; align-items: center;
+    }
+    #data-panel .panel-title { width: 100%; margin-bottom: 0; flex-shrink: 0; }
+    #data-panel .status-badge { flex-shrink: 0; margin-bottom: 0; }
+    #data-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; column-gap: 25px; row-gap: 1px; width: 100%; }
+    #data-grid .data-row { font-size: 12px; display: flex; justify-content: space-between; gap: 3px; }
+    #data-grid .data-row .label { white-space: nowrap; flex-shrink: 0; }
+    #data-grid .data-row .value { text-align: right; }
+    #chart-box { flex: 1; border-radius: 0; margin-left: 0; min-width: unset; }
+    .legend { top: 2px; right: 4px; }
+    .legend-item { font-size: 9px; padding: 1px 4px; }
+
+    .panel-section { padding: 10px 12px; }
+    .controls { padding: 8px 12px; }
+  }
+
+    .panel-section { padding: 10px 12px; }
+    .controls { padding: 8px 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="mobile-tabs">
+  <button class="active" onclick="mobileSwitch('params')">📊 参数</button>
+  <button onclick="mobileSwitch('sim')">🎣 仿真</button>
+</div>
+
+<div id="sidebar">
+  <div class="panel-section">
+    <div class="panel-title">🎣 浮漂参数</div>
+    <div class="param-group">
+      <div class="param-label">浮漂长度 L_f (cm) <span class="val" id="v_Lf">20</span></div>
+      <input class="param-input" type="number" id="p_Lf" value="20" step="1" min="5" max="50">
+    </div>
+    <div class="param-group">
+      <div class="param-label">排水量 m_displaced (g) <span class="val" id="v_md">3.2</span></div>
+      <input class="param-input" type="number" id="p_md" value="3.2" step="0.1" min="0.5" max="20">
+    </div>
+    <div class="param-group">
+      <div class="param-label">浮漂直径 d_f (cm) <span class="val" id="v_df">0.45</span></div>
+      <input class="param-input" type="number" id="p_df" value="0.45" step="0.01" min="0.1" max="2">
+    </div>
+    <div class="param-group">
+      <div class="param-label">浮漂自重 m_float (g) <span class="val" id="v_mf">0.2</span></div>
+      <input class="param-input" type="number" id="p_mf" value="0.2" step="0.1" min="0" max="5">
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <div class="panel-title"> 鱼线参数</div>
+    <div class="param-group">
+      <div class="param-label">鱼线号数 <span class="val" id="v_lineNo">1.5</span></div>
+      <input class="param-input" type="number" id="p_lineNo" value="1.5" step="0.1" min="0.1" max="5" title="号数决定直径: d(mm) = 0.05 × √(号数×10)">
+    </div>
+    <div class="param-group">
+      <div class="param-label">鱼线直径 d_l (cm) <span class="val" id="v_dl">0.0205</span> <span style="font-size:11px;color:#8899aa">（由号数自动换算）</span></div>
+      <input class="param-input" type="number" id="p_dl" value="0.0205" step="0.001" min="0.005" max="0.1" title="由号数自动换算, 也可手动修改">
+    </div>
+    <div class="param-group">
+      <div class="param-label">鱼线长度 L_l (cm) <span class="val" id="v_Ll">140</span></div>
+      <input class="param-input" type="number" id="p_Ll" value="140" step="10" min="20" max="500">
+    </div>
+    <div class="param-group">
+      <div class="param-label">锚点水深 D (cm) <span class="val" id="v_D">150</span></div>
+      <input class="param-input" type="number" id="p_D" value="150" step="10" min="10" max="500">
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <div class="panel-title"> 流体力学参数</div>
+    <div class="param-group">
+      <div class="param-label">水流速度 v (m/s) <span class="val" id="v_v">0.1</span></div>
+      <input class="param-input" type="number" id="p_v" value="0.1" step="0.1" min="0" max="5">
+    </div>
+    <div class="param-group">
+      <div class="param-label">浮漂阻力系数 Cd_f <span class="val" id="v_Cdf">0.4</span></div>
+      <input class="param-input" type="number" id="p_Cdf" value="0.4" step="0.1" min="0.1" max="3" title="浮漂侧面迎流(纺锤形) Cd≈0.3~0.5">
+    </div>
+    <div class="param-group">
+      <div class="param-label">鱼线阻力系数 Cd_l <span class="val" id="v_Cdl">0.7</span></div>
+      <input class="param-input" type="number" id="p_Cdl" value="0.7" step="0.1" min="0.1" max="3" title="细圆柱横向绕流, 弯曲后等效 Cd≈0.5~0.8">
+    </div>
+    <div class="param-group">
+      <div class="param-label">水密度 ρ (kg/m³) <span class="val" id="v_rho">1000</span></div>
+      <input class="param-input" type="number" id="p_rho" value="1000" step="10" min="900" max="1100">
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-play" id="btnPlay" onclick="togglePlay()">▶ 运行</button>
+    <button class="btn btn-reset" id="btnReset" onclick="resetSim()"> 重置</button>
+  </div>
+
+  <div class="theme-select">
+    <label>🎨 主题配色</label>
+    <select id="themeSelector" onchange="applyTheme(this.value)">
+      <option value="dark">🌙 深海蓝（默认）</option>
+      <option value="light">️ 明亮白</option>
+      <option value="contrast">🔬 高对比</option>
+      <option value="warm"> 暖色经典</option>
+      <option value="nature">🌿 自然绿水</option>
+    </select>
+  </div>
+
+  <div class="speed-control">
+    <label>仿真速度: <span id="v_speed">1.0</span>x</label>
+    <input type="range" id="p_speed" min="0.1" max="5" step="0.1" value="1.0" oninput="updateSpeed(this.value)">
+  </div>
+</div>
+
+<div id="main">
+  <div id="canvas-wrap"><canvas id="simCanvas"></canvas></div>
+  <div id="overlay">
+    <div id="data-panel">
+      <div class="panel-title"> 实时数据</div>
+      <span class="status-badge status-paused" id="statusBadge">已暂停</span>
+      <div id="data-grid">
+        <div class="data-row"><span class="label">角度 θ</span><span class="value" id="d_theta" style="color:#4fc3f7">90.0°</span></div>
+        <div class="data-row"><span class="label">角速度 ω</span><span class="value" id="d_omega" style="color:#ffd740">0.0 °/s</span></div>
+        <div class="data-row"><span class="label">浸入比例 p</span><span class="value" id="d_p" style="color:#66bb6a">0.0%</span></div>
+        <div class="data-row"><span class="label">水上长度</span><span class="value" id="d_above" style="color:#39FF14">0.0 cm</span></div>
+        <div class="data-row"><span class="label">模拟时间 t</span><span class="value" id="d_time" style="color:#8899aa">0.00 s</span></div>
+        <div class="data-row"><span class="label">浮力 Ff</span><span class="value" id="d_Ff" style="color:#4fc3f7">0.00 mN</span></div>
+        <div class="data-row"><span class="label">总冲力 Fc</span><span class="value" id="d_Fc" style="color:#ef5350">0.00 mN</span></div>
+        <div class="data-row"><span class="label">上升力 Fs</span><span class="value" id="d_Fs" style="color:#66bb6a">0.00 mN</span></div>
+        <div class="data-row"><span class="label">下压力 Fy</span><span class="value" id="d_Fy" style="color:#ffa726">0.00 mN</span></div>
+        <div class="data-row"><span class="label">浮漂冲力 Fc_f</span><span class="value" id="d_Fcf" style="color:#ef9a9a">0.00 mN</span></div>
+        <div class="data-row"><span class="label">鱼线冲力 Fc_l</span><span class="value" id="d_Fcl" style="color:#e53935">0.00 mN</span></div>
+        <div class="data-row"><span class="label">线拉力 Fl</span><span class="value" id="d_Fl" style="color:#ce93d8">0.00 mN</span></div>
+      </div>
+    </div>
+    <div id="chart-box">
+      <canvas id="chartCanvas"></canvas>
+      <div class="legend" id="legend"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== 常量 ====================
+const G = 9.8;
+const CM = 0.01;
+const DT = 0.0005;
+const MAX_STEPS = 200;
+const HIST_MAX = 6000;
+const HIST_INT = 0.016;
+
+// ==================== 状态 ====================
+let params = {};
+let state = { theta: 0, omega: 0, time: 0 };
+let running = false, speedMul = 1.0, animId = null, lastTs = null;
+
+// 装饰鱼群 - 初始化位置、大小、速度
+const decoFish = [
+  { xFrac: 0.35, yFrac: 0.60, size: 18, speed: 12, dir: 1,  yAmp: 8, phase: 0,    hue: 30  },
+  { xFrac: 0.65, yFrac: 0.72, size: 14, speed: 9,  dir: -1, yAmp: 6, phase: 1.5,  hue: 200 },
+  { xFrac: 0.50, yFrac: 0.82, size: 20, speed: 15, dir: 1,  yAmp: 10,phase: 3.0,  hue: 45  },
+  { xFrac: 0.78, yFrac: 0.55, size: 12, speed: 8,  dir: -1, yAmp: 5, phase: 4.2,  hue: 180 },
+  { xFrac: 0.20, yFrac: 0.68, size: 16, speed: 11, dir: 1,  yAmp: 7, phase: 2.1,  hue: 10  },
+];
+let histTimer = 0, forceHistory = [];
+
+const curveVis = { Ff:true, Fc:true, Fs:true, Fy:true, Fc_f:true, Fc_l:true, Fl:true };
+const curveLbl = { Ff:'浮力 Ff', Fc:'总冲力 Fc', Fs:'上升力 Fs', Fy:'下压力 Fy', Fc_f:'浮漂冲力 Fc_f', Fc_l:'鱼线冲力 Fc_l', Fl:'线拉力 Fl' };
+
+// ==================== 主题配色 ====================
+const themes = {
+  dark: {
+    // 深海蓝 — 整体提亮，水上淡蓝天空色，水下深海蓝
+    bg:'#1e2a3a', sidebar:'#1a2538', panelBg:'#152030', border:'#2a3a52',
+    text:'#e0e8f0', textDim:'#8899aa', accent:'#e94560', valColor:'#4fc3f7',
+    water:'#2196f3', waterBg:'rgba(33,150,243,0.10)', line:'#bbc8d8', lineCurve:'#8899aa',
+    anchor:'#667788', anchorStroke:'#8899aa',
+    Ff:'#4fc3f7', Fc:'#ef5350', Fs:'#66bb6a', Fy:'#ffa726',
+    Fc_f:'#ef9a9a', Fc_l:'#e53935', Fl:'#ce93d8',
+    angle:'#ffd740', current:'#00bcd4',
+    statusBg:'rgba(21,32,48,0.9)', gridLine:'rgba(255,255,255,0.06)', axisLine:'rgba(255,255,255,0.18)',
+    chartBg:'#152030',
+    aboveWater:'#39FF14', underwater:'#2ECC40',
+    tip:'#f44336'
+  },
+  light: {
+    // 晴空白 — 水上天蓝，水下深水蓝
+    bg:'#f5f7fa', sidebar:'#ffffff', panelBg:'#f0f3f8', border:'#d0d8e0',
+    text:'#1e293b', textDim:'#64748b', accent:'#c0392b', valColor:'#1976d2',
+    water:'#1976d2', waterBg:'rgba(25,118,210,0.06)', line:'#546e7a', lineCurve:'#78909c',
+    anchor:'#546e7a', anchorStroke:'#78909c',
+    Ff:'#1976d2', Fc:'#c62828', Fs:'#2e7d32', Fy:'#e65100',
+    Fc_f:'#e53935', Fc_l:'#b71c1c', Fl:'#7b1fa2',
+    angle:'#f57f17', current:'#00897b',
+    statusBg:'rgba(240,243,248,0.92)', gridLine:'rgba(0,0,0,0.06)', axisLine:'rgba(0,0,0,0.2)',
+    chartBg:'#fafbfd',
+    aboveWater:'#39FF14', underwater:'#2ECC40',
+    tip:'#c62828'
+  },
+  nature: {
+    // 自然绿水 — 提亮背景，水上嫩绿，水下深碧
+    bg:'#132e1f', sidebar:'#163022', panelBg:'#102818', border:'#1e5a34',
+    text:'#d8f0e0', textDim:'#7ab88e', accent:'#4ade80', valColor:'#6ee7b7',
+    water:'#2dd4a8', waterBg:'rgba(45,212,168,0.08)', line:'#8fbfa0', lineCurve:'#5a9a72',
+    anchor:'#6b9f7b', anchorStroke:'#8fbfa0',
+    Ff:'#6ee7b7', Fc:'#f87171', Fs:'#34d399', Fy:'#fbbf24',
+    Fc_f:'#fca5a5', Fc_l:'#ef4444', Fl:'#c084fc',
+    angle:'#fde047', current:'#5eead4',
+    statusBg:'rgba(16,40,24,0.92)', gridLine:'rgba(100,220,150,0.07)', axisLine:'rgba(100,220,150,0.18)',
+    chartBg:'#0e2416',
+    aboveWater:'#39FF14', underwater:'#2ECC40',
+    tip:'#f87171'
+  },
+  contrast: {
+    // 高对比 — 纯黑底，高饱和荧光色，水上亮绿，水下深蓝
+    bg:'#0a0a0f', sidebar:'#111118', panelBg:'#0f0f18', border:'#333340',
+    text:'#ffffff', textDim:'#aaaaaa', accent:'#ff4444', valColor:'#00ffff',
+    water:'#0088ff', waterBg:'rgba(0,136,255,0.10)', line:'#eeeeee', lineCurve:'#cccccc',
+    anchor:'#cccccc', anchorStroke:'#ffffff',
+    Ff:'#00ffff', Fc:'#ff4444', Fs:'#44ff44', Fy:'#ffaa00',
+    Fc_f:'#ff8888', Fc_l:'#ff0000', Fl:'#ff44ff',
+    angle:'#ffff00', current:'#00ff88',
+    statusBg:'rgba(15,15,24,0.92)', gridLine:'rgba(255,255,255,0.08)', axisLine:'rgba(255,255,255,0.3)',
+    chartBg:'#08080e',
+    aboveWater:'#39FF14', underwater:'#2ECC40',
+    tip:'#ff2222'
+  },
+  warm: {
+    // 暖沙色 — 暖色调，水上暖橙米，水下深棕褐
+    bg:'#30201a', sidebar:'#3a2820', panelBg:'#28180f', border:'#5d4037',
+    text:'#f0e8e0', textDim:'#b0907a', accent:'#ff7043', valColor:'#ffca28',
+    water:'#5c9bc4', waterBg:'rgba(92,155,196,0.10)', line:'#bcaaa4', lineCurve:'#8d6e63',
+    anchor:'#8d6e63', anchorStroke:'#a1887f',
+    Ff:'#5c9bc4', Fc:'#ef5350', Fs:'#66bb6a', Fy:'#ffa726',
+    Fc_f:'#ef9a9a', Fc_l:'#e53935', Fl:'#ab47bc',
+    angle:'#ffca28', current:'#26c6da',
+    statusBg:'rgba(40,24,15,0.9)', gridLine:'rgba(255,200,150,0.06)', axisLine:'rgba(255,200,150,0.18)',
+    chartBg:'#28180f',
+    aboveWater:'#39FF14', underwater:'#2ECC40',
+    tip:'#ff5722'
+  }
+};
+let currentTheme = 'dark';
+let curveClr = {};  // 由 applyTheme 初始化
+
+function applyTheme(name) {
+  currentTheme = name;
+  const t = themes[name];
+  curveClr = { Ff:t.Ff, Fc:t.Fc, Fs:t.Fs, Fy:t.Fy, Fc_f:t.Fc_f, Fc_l:t.Fc_l, Fl:t.Fl };
+
+  // 更新 CSS 主题色
+  document.body.style.background = t.bg;
+  document.body.style.color = t.text;
+  document.getElementById('sidebar').style.background = t.sidebar;
+  document.getElementById('sidebar').style.borderColor = t.border;
+  document.getElementById('canvas-wrap').style.background = t.bg;
+
+  // 叠加层背景色
+  const overlayBg = t.bg === '#f5f7fa' ? 'rgba(240,243,248,0.92)' : t.chartBg;
+  document.documentElement.style.setProperty('--overlay-bg', overlayBg);
+
+  // 数据面板
+  const dp = document.getElementById('data-panel');
+  if (dp) {
+    dp.querySelectorAll('.data-row .label').forEach(el => { el.style.color = t.textDim; });
+    dp.querySelector('.panel-title').style.color = t.accent;
+  }
+
+  // 移动端标签栏
+  const mobileTabs = document.getElementById('mobile-tabs');
+  if (mobileTabs) {
+    mobileTabs.style.background = t.sidebar;
+    mobileTabs.style.borderColor = t.border;
+    mobileTabs.querySelectorAll('button').forEach(btn => {
+      btn.style.color = t.textDim;
+    });
+    const activeBtn = mobileTabs.querySelector('button.active');
+    if (activeBtn) {
+      activeBtn.style.color = t.valColor;
+      activeBtn.style.borderBottomColor = t.valColor;
+    }
+  }
+
+  // 更新面板样式
+  document.querySelectorAll('.panel-section').forEach(el => { el.style.borderColor = t.border; });
+  document.querySelectorAll('.param-input').forEach(el => { el.style.background = t.panelBg; el.style.borderColor = t.border; el.style.color = t.text; });
+  document.querySelectorAll('.param-label .val').forEach(el => { el.style.color = t.valColor; });
+  document.querySelectorAll('.param-label').forEach(el => { el.style.color = t.textDim; });
+  document.querySelectorAll('.panel-title').forEach(el => { el.style.color = t.accent; });
+  document.querySelectorAll('.data-row').forEach(el => { el.style.borderColor = t.border; });
+  document.querySelectorAll('.data-row .label').forEach(el => { el.style.color = t.textDim; });
+  document.querySelectorAll('.controls').forEach(el => { el.style.borderColor = t.border; });
+  document.querySelectorAll('.theme-select').forEach(el => { el.style.borderColor = t.border; });
+  document.querySelector('.theme-select label').style.color = t.textDim;
+  document.getElementById('themeSelector').style.background = t.panelBg;
+  document.getElementById('themeSelector').style.borderColor = t.border;
+  document.getElementById('themeSelector').style.color = t.text;
+  document.getElementById('btnReset').style.background = t.border;
+  document.getElementById('btnReset').style.color = t.text;
+
+  // 更新数据面板数值颜色
+  const colorMap = { d_Ff:t.Ff, d_Fc:t.Fc, d_Fs:t.Fs, d_Fy:t.Fy, d_Fcf:t.Fc_f, d_Fcl:t.Fc_l, d_Fl:t.Fl,
+    d_theta:t.valColor, d_omega:t.angle, d_p:t.Fs, d_above:t.aboveWater, d_time:t.textDim };
+  for (const [id, clr] of Object.entries(colorMap)) {
+    const el = document.getElementById(id);
+    if (el) el.style.color = clr;
+  }
+
+  // 更新图例背景
+  document.documentElement.style.setProperty('--legend-bg', t.statusBg);
+  document.documentElement.style.setProperty('--legend-text', t.text);
+
+  // 重建图例
+  buildLegend();
+}
+
+const simCanvas = document.getElementById('simCanvas');
+const simCtx = simCanvas.getContext('2d');
+const chartCanvas = document.getElementById('chartCanvas');
+const chartCtx = chartCanvas.getContext('2d');
+
+// ==================== 读取参数 ====================
+function readParams() {
+  const g = id => parseFloat(document.getElementById(id).value);
+  params.Lf  = g('p_Lf')  * CM;
+  params.md  = g('p_md')  * 0.001;
+  params.df  = g('p_df')  * CM;
+  params.mf  = g('p_mf')  * 0.001;
+  params.dl  = g('p_dl')  * CM;
+  params.Ll  = g('p_Ll')  * CM;
+  params.D   = g('p_D')   * CM;
+  params.v   = g('p_v');
+  params.Cdf = g('p_Cdf');
+  params.Cdl = g('p_Cdl');
+  params.rho = g('p_rho');
+  ['p_Lf','p_md','p_df','p_mf','p_lineNo','p_dl','p_Ll','p_D','p_v','p_Cdf','p_Cdl','p_rho'].forEach(id => {
+    const el = document.getElementById('v_' + id.substring(2));
+    if (el) el.textContent = document.getElementById(id).value;
+  });
+}
+
+// ==================== 核心物理 ====================
+
+/**
+ * 浸入比例计算
+ * 模型: 锚点在深度D, 鱼线长L_l从锚点以角度θ延伸到浮漂底部, 浮漂长L_f沿同方向延伸
+ * 浮漂顶部竖直高度(相对锚点) = (L_l + L_f) * sinθ
+ * 水面在锚点上方 D 处
+ * 浮漂顶部超出水面的长度(沿浮漂轴向) = (L_l+L_f)*sinθ - D, 再除以 sinθ 得到沿轴向的水上长度
+ * 更简单: 浮漂顶部竖直高度 - D = 水上竖直高度, 除以 sinθ = 水上轴向长度
+ * 浸入比例 p = 1 - 水上轴向长度 / L_f
+ */
+function computeP(theta) {
+  const { Lf, Ll, D } = params;
+  const sinT = Math.sin(theta);
+  if (sinT < 0.0001) return 1; // 水平时全部没入
+
+  // 浮漂顶部相对于锚点的竖直高度
+  const topHeight = (Ll + Lf) * sinT;
+  // 超出水面的竖直高度
+  const aboveWaterH = topHeight - D;
+
+  if (aboveWaterH <= 0) return 1; // 全部在水下
+
+  // 水上部分的轴向长度 = aboveWaterH / sinθ
+  const aboveWaterLen = aboveWaterH / sinT;
+  // 浸入比例
+  let p = 1 - aboveWaterLen / Lf;
+  return Math.max(0, Math.min(1, p));
+}
+
+/**
+ * 计算各力
+ */
+function computeForces(theta, p) {
+  const { Lf, md, df, dl, Ll, v, Cdf, Cdl, rho } = params;
+
+  const Ff_max = md * G;
+  const Ff = Ff_max * p;
+
+  const cosT = Math.cos(theta);
+  const sinT = Math.sin(theta);
+
+  // 迎水面积 (均取竖直投影等效长度)
+  const Af = df * Lf * p * sinT;  // 浮漂: 浸水长度 × sinθ = 竖直投影
+  const Al = dl * Ll * sinT;      // 鱼线: 全长 × sinθ = 竖直投影
+
+  // 冲力
+  const Fc_f = 0.5 * rho * v * v * Cdf * Af;
+  const Fc_l = 0.5 * rho * v * v * Cdl * Al;
+  const Fc = Fc_f + Fc_l;
+
+  const Fs = Ff * cosT;    // 上升力 (垂直鱼线方向)
+  const Fy = Fc * sinT;    // 下压力 (垂直鱼线方向)
+
+  // 沿鱼线方向 → 线拉力
+  const Ff_para = Ff * sinT;
+  const Fc_para = Fc * cosT;
+  const Fl = Math.abs(Ff_para - Fc_para);
+
+  // 垂直鱼线方向净力 (正 = θ增大/浮漂上升)
+  const F_perp = Fs - Fy;
+
+  return { Ff, Fc, Fs, Fy, Fc_f, Fc_l, Fl, F_perp, Ff_max };
+}
+
+/**
+ * 物理步进
+ */
+function physicsStep(dt) {
+  const { mf, dl, Ll, rho, Lf, D } = params;
+
+  const p = computeP(state.theta);
+  const forces = computeForces(state.theta, p);
+
+  // 有效质量
+  const lineMass = rho * Math.PI * (dl / 2) ** 2 * Ll * 1000;
+  const m_eff = mf + lineMass / 3;
+
+  // 角加速度 + 阻尼
+  const damping = 2.5;
+  const alpha = forces.F_perp / m_eff - damping * state.omega;
+
+  // 半隐式欧拉
+  state.omega += alpha * dt;
+  state.theta += state.omega * dt;
+
+  // 边界: θ ∈ (0, ~90°]
+  // 不再设 θ_max 上限 — 当 L_l > D 时, 浮漂可以出水 (p=0, 浮力=0, 物理自然平衡)
+  if (state.theta < 0.001) { state.theta = 0.001; state.omega = Math.max(0, state.omega); }
+  if (state.theta > Math.PI / 2 - 0.001) { state.theta = Math.PI / 2 - 0.001; state.omega = Math.min(0, state.omega); }
+
+  state.time += dt;
+  return forces;
+}
+
+// ==================== 画布尺寸 ====================
+function resizeCanvases() {
+  const sw = document.getElementById('canvas-wrap');
+  simCanvas.width = sw.clientWidth * devicePixelRatio;
+  simCanvas.height = sw.clientHeight * devicePixelRatio;
+  simCanvas.style.width = sw.clientWidth + 'px';
+  simCanvas.style.height = sw.clientHeight + 'px';
+  const cb = document.getElementById('chart-box');
+  if (cb) {
+    chartCanvas.width = cb.clientWidth * devicePixelRatio;
+    chartCanvas.height = cb.clientHeight * devicePixelRatio;
+    chartCanvas.style.width = cb.clientWidth + 'px';
+    chartCanvas.style.height = cb.clientHeight + 'px';
+  }
+}
+let prevMobile = window.innerWidth <= 768;
+window.addEventListener('resize', () => {
+  resizeCanvases();
+  const isMobile = window.innerWidth <= 768;
+  if (isMobile !== prevMobile) {
+    prevMobile = isMobile;
+    if (isMobile) {
+      mobileSwitch('sim');
+    } else {
+      // 回到桌面模式，恢复两个面板
+      document.getElementById('sidebar').classList.remove('hidden-mobile');
+      document.getElementById('main').classList.remove('hidden-mobile');
+    }
+  }
+});
+
+// ==================== 绘制仿真场景 ====================
+function drawScene(forces) {
+  const W = simCanvas.width, H = simCanvas.height;
+  const dpr = devicePixelRatio;
+  const ctx = simCtx;
+  ctx.clearRect(0, 0, W, H);
+
+  const t = themes[currentTheme]; // 当前主题配色
+  const { Lf, Ll, D, v } = params;
+  const theta = state.theta;
+  const p = computeP(theta);
+
+  // 画布坐标系: 锚点在左侧, 水面按 水下:水上 = 6:4 分布
+  const anchorX = W * 0.22;
+  const anchorY = H * 0.96;
+  const waterY = H * 0.50;   // 水面: 上方50%, 下方(锚点)50%
+  const depthPx = anchorY - waterY;
+  const pxPerM = depthPx / D;
+
+  // 鱼线末端(浮漂底部)位置
+  let lineEndX, lineEndY;
+  let floatBaseX, floatBaseY; // 浮漂底部(用于绘制)
+
+  if (v < 0.01 && Ll > D) {
+    // v=0 + 线长>水深: 浮漂在水面, 锚点正上方
+    lineEndX = anchorX;
+    lineEndY = waterY;
+    floatBaseX = anchorX;
+    floatBaseY = waterY;
+  } else {
+    lineEndX = anchorX + Ll * Math.cos(theta) * pxPerM;
+    lineEndY = anchorY - Ll * Math.sin(theta) * pxPerM;
+    floatBaseX = lineEndX;
+    floatBaseY = lineEndY;
+  }
+
+  // 浮漂顶部位置 (始终沿θ方向延伸)
+  const drawTheta = (v < 0.01 && Ll > D) ? Math.PI / 2 : theta;
+  const floatTopX = floatBaseX + Lf * Math.cos(drawTheta) * pxPerM;
+  const floatTopY = floatBaseY - Lf * Math.sin(drawTheta) * pxPerM;
+
+  // ---- 水面 ----
+  // 水下区域用淡水色调
+  ctx.fillStyle = t.waterBg;
+  ctx.fillRect(0, waterY, W, H - waterY);
+  ctx.strokeStyle = t.water;
+  ctx.lineWidth = 2 * dpr;
+  ctx.beginPath();
+  for (let x = 0; x <= W; x += 2) {
+    const wy = waterY + Math.sin(x * 0.015 - state.time * 2.5) * 3 * dpr;
+    x === 0 ? ctx.moveTo(x, wy) : ctx.lineTo(x, wy);
+  }
+  ctx.stroke();
+  ctx.fillStyle = t.water;
+  ctx.font = `${12 * dpr}px "Microsoft YaHei"`;
+  ctx.fillText('水面', 8 * dpr, waterY - 6 * dpr);
+
+  // 水流方向指示 (叠加层下方, 水面之上)
+  if (v > 0.01) {
+    const arrowY = H * 0.36;
+    const arrowStart = 15 * dpr;
+    const arrowEnd = arrowStart + 70 * dpr;
+    ctx.strokeStyle = t.current;
+    ctx.fillStyle = t.current;
+    ctx.lineWidth = 2.5 * dpr;
+    ctx.font = `bold ${16 * dpr}px "Microsoft YaHei"`;
+    ctx.beginPath();
+    ctx.moveTo(arrowStart, arrowY);
+    ctx.lineTo(arrowEnd, arrowY);
+    ctx.stroke();
+    const hl = 9 * dpr;
+    ctx.beginPath();
+    ctx.moveTo(arrowEnd, arrowY);
+    ctx.lineTo(arrowEnd - hl, arrowY - hl * 0.5);
+    ctx.lineTo(arrowEnd - hl, arrowY + hl * 0.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillText(`水流 ${v} m/s →`, arrowEnd + 8 * dpr, arrowY + 5 * dpr);
+  }
+
+  // ---- 装饰鱼群 ----
+  const fishAreaTop = waterY + 15 * dpr;
+  const fishAreaBottom = H - 10 * dpr;
+  for (const f of decoFish) {
+    const swim = state.time * f.speed * f.dir;
+    let fx = (f.xFrac * W + swim) % (W + 60 * dpr);
+    if (fx < -30 * dpr) fx += W + 60 * dpr;
+    if (fx > W + 30 * dpr) fx -= W + 60 * dpr;
+    const fy = f.yFrac * H + Math.sin(state.time * 1.2 + f.phase) * f.yAmp * dpr;
+    const clampedY = Math.max(fishAreaTop, Math.min(fishAreaBottom, fy));
+    const sz = f.size * dpr;
+    const flip = f.dir;
+
+    ctx.save();
+    ctx.translate(fx, clampedY);
+    ctx.scale(flip, 1);
+    ctx.globalAlpha = 0.55;
+
+    // 身体
+    ctx.fillStyle = `hsl(${f.hue}, 70%, 55%)`;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, sz, sz * 0.45, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 尾巴
+    ctx.beginPath();
+    ctx.moveTo(-sz * 0.8, 0);
+    ctx.lineTo(-sz * 1.4, -sz * 0.5);
+    ctx.lineTo(-sz * 1.4, sz * 0.5);
+    ctx.closePath();
+    ctx.fill();
+
+    // 眼睛
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(sz * 0.45, -sz * 0.08, sz * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#111';
+    ctx.beginPath();
+    ctx.arc(sz * 0.50, -sz * 0.08, sz * 0.07, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  // ---- 锚点 ----
+  ctx.fillStyle = t.anchor;
+  ctx.beginPath();
+  ctx.arc(anchorX, anchorY, 7 * dpr, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = t.anchorStroke;
+  ctx.lineWidth = 1.5 * dpr;
+  ctx.stroke();
+  ctx.fillStyle = t.anchorStroke;
+  ctx.font = `${11 * dpr}px "Microsoft YaHei"`;
+  ctx.fillText('铅坠', anchorX + 12 * dpr, anchorY + 4 * dpr);
+
+  // ---- 鱼线 ----
+  ctx.strokeStyle = t.line;
+  ctx.lineWidth = 1.2 * dpr;
+
+  const surfaceX = anchorX; // v=0时, 浮漂在锚点正上方
+  const surfaceY = waterY;
+
+  if (v < 0.01 && Ll > D) {
+    // 无水流 + 线长 > 水深: 鱼线垂直上升到水面, 多余部分在水面弯曲
+    const verticalTopY = waterY; // 线从锚点垂直到水面
+    ctx.beginPath();
+    ctx.moveTo(anchorX, anchorY);
+    ctx.lineTo(anchorX, verticalTopY);
+    ctx.stroke();
+    // 多余线长在水面附近弯曲
+    const excessLen = (Ll - D) * pxPerM;
+    if (excessLen > 5 * dpr) {
+      ctx.strokeStyle = t.lineCurve;
+      ctx.beginPath();
+      ctx.moveTo(anchorX, verticalTopY);
+      const curveEndX = anchorX + excessLen * 0.6;
+      const curveEndY = verticalTopY + excessLen * 0.15;
+      const cpX = anchorX + excessLen * 0.3;
+      const cpY = verticalTopY - excessLen * 0.1;
+      ctx.quadraticCurveTo(cpX, cpY, curveEndX, curveEndY);
+      ctx.stroke();
+    }
+  } else if (v < 0.01) {
+    // 无水流 + 线长 <= 水深: 垂直直线, 浮漂在水下
+    ctx.beginPath();
+    ctx.moveTo(anchorX, anchorY);
+    ctx.lineTo(lineEndX, lineEndY);
+    ctx.stroke();
+  } else {
+    // 有水流: 斜线
+    ctx.beginPath();
+    ctx.moveTo(anchorX, anchorY);
+    ctx.lineTo(lineEndX, lineEndY);
+    ctx.stroke();
+  }
+
+  // ---- 浮漂 (按实际比例绘制, 不加放大) ----
+  const fDrawLen = Lf * pxPerM;  // 实际长度, 不放大
+  const fHalfW = 3.5 * dpr;      // 固定宽度, 保证可见
+
+  // 浮漂方向向量 (canvas坐标)
+  const dx = Math.cos(drawTheta);
+  const dy = -Math.sin(drawTheta);
+
+  // 浮漂底部和顶部
+  const fbX = floatBaseX;
+  const fbY = floatBaseY;
+  const ftX = floatTopX;
+  const ftY = floatTopY;
+
+  // 水线在浮漂上的位置
+  // 水下轴向长度 = L_f * p, 画布上 = fDrawLen * p
+  const immersedDrawLen = fDrawLen * p;
+  const wlX = fbX + immersedDrawLen * dx;
+  const wlY = fbY + immersedDrawLen * dy;
+
+  ctx.lineCap = 'round';
+  ctx.lineWidth = fHalfW * 2;
+
+  // 水下部分
+  ctx.strokeStyle = t.underwater;
+  ctx.beginPath();
+  ctx.moveTo(fbX, fbY);
+  ctx.lineTo(wlX, wlY);
+  ctx.stroke();
+
+  // 水上部分
+  ctx.strokeStyle = t.aboveWater;
+  ctx.beginPath();
+  ctx.moveTo(wlX, wlY);
+  ctx.lineTo(ftX, ftY);
+  ctx.stroke();
+
+  // 浮漂尖端
+  ctx.fillStyle = t.tip;
+  ctx.beginPath();
+  ctx.arc(ftX, ftY, 3 * dpr, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ---- 角度 θ 标注 ----
+  const arcR = 35 * dpr;
+  ctx.strokeStyle = t.angle;
+  ctx.lineWidth = 1.5 * dpr;
+  ctx.beginPath();
+  ctx.arc(anchorX, anchorY, arcR, -theta, 0, true);
+  ctx.stroke();
+
+  const lblAngle = -theta / 2;
+  const lblR = arcR + 16 * dpr;
+  ctx.fillStyle = t.angle;
+  ctx.font = `bold ${12 * dpr}px "Microsoft YaHei"`;
+  ctx.fillText(
+    `θ=${(theta * 180 / Math.PI).toFixed(1)}°`,
+    anchorX + lblR * Math.cos(lblAngle) - 18 * dpr,
+    anchorY + lblR * Math.sin(lblAngle) + 4 * dpr
+  );
+
+  // ---- 力矢量 (虚线 + 最大长度等比缩放 + 主题色) ----
+  const fScale = 10000 * dpr; // px/N
+  const maxArrowLen = 140 * dpr; // 箭头最大像素长度
+
+  // 力的作用点: 浮漂中心
+  const cx = fbX + fDrawLen * 0.5 * dx;
+  const cy = fbY + fDrawLen * 0.5 * dy;
+
+  // 计算所有箭头的原始终点
+  const arrows = [];
+  if (forces.Ff > 1e-6)
+    arrows.push({ fx:cx, fy:cy, tx:cx, ty:cy - forces.Ff*fScale, color:t.Ff, label:`Ff=${(forces.Ff*1000).toFixed(1)}`, lox:5*dpr, loy:-12*dpr });
+  if (forces.Fc > 1e-6)
+    arrows.push({ fx:cx, fy:cy, tx:cx + forces.Fc*fScale, ty:cy, color:t.Fc, label:`Fc=${(forces.Fc*1000).toFixed(1)}`, lox:6*dpr, loy:-12*dpr });
+  if (forces.Fs > 1e-6) {
+    const len = forces.Fs * fScale;
+    arrows.push({ fx:cx, fy:cy, tx:cx - len*Math.sin(theta), ty:cy - len*Math.cos(theta), color:t.Fs, label:`Fs=${(forces.Fs*1000).toFixed(2)}`, lox:-30*dpr, loy:-8*dpr });
+  }
+  if (forces.Fy > 1e-6) {
+    const len = forces.Fy * fScale;
+    arrows.push({ fx:cx, fy:cy, tx:cx + len*Math.sin(theta), ty:cy + len*Math.cos(theta), color:t.Fy, label:`Fy=${(forces.Fy*1000).toFixed(2)}`, lox:5*dpr, loy:12*dpr });
+  }
+
+  // 计算缩放比例
+  let maxLen = 0;
+  for (const a of arrows) {
+    const len = Math.hypot(a.tx - a.fx, a.ty - a.fy);
+    if (len > maxLen) maxLen = len;
+  }
+  const scale = maxLen > maxArrowLen ? maxArrowLen / maxLen : 1;
+
+  function drawArrow(a) {
+    const tx = a.fx + (a.tx - a.fx) * scale;
+    const ty = a.fy + (a.ty - a.fy) * scale;
+    const angle = Math.atan2(ty - a.fy, tx - a.fx);
+    const hl = 7 * dpr;
+
+    // 虚线
+    ctx.strokeStyle = a.color;
+    ctx.lineWidth = 2 * dpr;
+    ctx.setLineDash([8 * dpr, 4 * dpr]);
+    ctx.beginPath(); ctx.moveTo(a.fx, a.fy); ctx.lineTo(tx, ty); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 实心箭头
+    ctx.fillStyle = a.color;
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(tx - hl * Math.cos(angle - 0.4), ty - hl * Math.sin(angle - 0.4));
+    ctx.lineTo(tx - hl * Math.cos(angle + 0.4), ty - hl * Math.sin(angle + 0.4));
+    ctx.closePath(); ctx.fill();
+
+    // 标签
+    if (a.label) {
+      ctx.font = `bold ${10 * dpr}px "Microsoft YaHei"`;
+      ctx.fillStyle = a.color;
+      ctx.fillText(a.label, tx + (a.lox || 4*dpr), ty + (a.loy || -4*dpr));
+    }
+  }
+  for (const a of arrows) drawArrow(a);
+
+  // 状态指示 (叠加层下方, 右上角)
+  const netP = forces.Fs - forces.Fy;
+  const isBalance = Math.abs(netP) < forces.Fc * 0.01;
+  const statusText = isBalance ? '⚖ 平衡' : (netP > 0 ? '↑ 上升' : '↓ 下沉');
+  const statusClr = isBalance ? t.angle : (netP > 0 ? t.aboveWater : t.Fc);
+  ctx.fillStyle = statusClr;
+  ctx.font = `bold ${16 * dpr}px "Microsoft YaHei"`;
+  ctx.fillText(statusText, W - 120 * dpr, H * 0.36);
+
+  const aboveCm = Math.max(0, ((Ll + Lf) * Math.sin(theta) - D)) * 100;
+  ctx.fillStyle = t.textDim;
+  ctx.font = `${14 * dpr}px "Microsoft YaHei"`;
+  ctx.fillText(`浸入: ${(p*100).toFixed(1)}%  水上: ${aboveCm.toFixed(1)}cm`, W - 220 * dpr, H * 0.36 + 20 * dpr);
+}
+
+// ==================== 绘制图表 ====================
+function drawChart() {
+  const W = chartCanvas.width, H = chartCanvas.height;
+  const dpr = devicePixelRatio;
+  const ctx = chartCtx;
+  ctx.clearRect(0, 0, W, H);
+  if (forceHistory.length < 2) return;
+
+  const t = themes[currentTheme];
+
+  const mg = { top:18*dpr, right:15*dpr, bottom:28*dpr, left:55*dpr };
+  const pW = W - mg.left - mg.right, pH = H - mg.top - mg.bottom;
+
+  const tLast = forceHistory[forceHistory.length - 1].time;
+  const tWin = 10;
+  const tStart = Math.max(0, tLast - tWin);
+
+  let maxF = 0;
+  for (const h of forceHistory)
+    for (const k of Object.keys(curveVis))
+      if (curveVis[k] && h[k] > maxF) maxF = h[k];
+  maxF = Math.max(maxF * 1.1, 0.001);
+
+  const toX = time => mg.left + (time - tStart) / tWin * pW;
+  const toY = f => mg.top + pH - (f / maxF) * pH;
+
+  // 网格
+  ctx.strokeStyle = t.gridLine;
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++) {
+    const y = mg.top + pH * i / 5;
+    ctx.beginPath(); ctx.moveTo(mg.left, y); ctx.lineTo(mg.left + pW, y); ctx.stroke();
+    const x = mg.left + pW * i / 5;
+    ctx.beginPath(); ctx.moveTo(x, mg.top); ctx.lineTo(x, mg.top + pH); ctx.stroke();
+  }
+
+  // 坐标轴
+  ctx.strokeStyle = t.axisLine;
+  ctx.lineWidth = 1.5 * dpr;
+  ctx.beginPath();
+  ctx.moveTo(mg.left, mg.top); ctx.lineTo(mg.left, mg.top + pH); ctx.lineTo(mg.left + pW, mg.top + pH);
+  ctx.stroke();
+
+  // Y轴标签
+  ctx.fillStyle = t.textDim;
+  ctx.font = `${11 * dpr}px "Microsoft YaHei"`;
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 5; i++) {
+    ctx.fillText((maxF * (1 - i/5) * 1000).toFixed(1) + 'mN', mg.left - 5*dpr, mg.top + pH*i/5 + 3*dpr);
+  }
+
+  // X轴标签
+  ctx.textAlign = 'center';
+  for (let i = 0; i <= 5; i++) {
+    ctx.fillText((tStart + tWin*i/5).toFixed(1) + 's', mg.left + pW*i/5, mg.top + pH + 16*dpr);
+  }
+
+  ctx.fillStyle = t.textDim;
+  ctx.font = `${13 * dpr}px "Microsoft YaHei"`;
+  ctx.textAlign = 'left';
+  ctx.fillText('力-时间曲线 (mN)', mg.left, mg.top - 6*dpr);
+
+  // 曲线
+  for (const k of Object.keys(curveVis)) {
+    if (!curveVis[k]) continue;
+    ctx.strokeStyle = curveClr[k];
+    ctx.lineWidth = 1.8 * dpr;
+    ctx.beginPath();
+    let started = false;
+    for (const h of forceHistory) {
+      if (h.time < tStart) continue;
+      started ? ctx.lineTo(toX(h.time), toY(h[k])) : (ctx.moveTo(toX(h.time), toY(h[k])), started = true);
+    }
+    ctx.stroke();
+  }
+}
+
+// ==================== 图例 ====================
+function buildLegend() {
+  const c = document.getElementById('legend');
+  c.innerHTML = '';
+  for (const [k, lbl] of Object.entries(curveLbl)) {
+    const el = document.createElement('div');
+    el.className = 'legend-item' + (curveVis[k] ? '' : ' hidden');
+    el.innerHTML = `<span class="legend-dot" style="background:${curveClr[k]}"></span>${lbl}`;
+    el.onclick = () => { curveVis[k] = !curveVis[k]; el.className = 'legend-item' + (curveVis[k] ? '' : ' hidden'); };
+    c.appendChild(el);
+  }
+}
+
+// ==================== 更新面板 ====================
+function updatePanel(forces) {
+  const { Lf, Ll, D } = params;
+  const p = computeP(state.theta);
+  const aboveCm = Math.max(0, ((Ll + Lf) * Math.sin(state.theta) - D)) * 100;
+
+  document.getElementById('d_theta').textContent = (state.theta * 180 / Math.PI).toFixed(1) + '°';
+  document.getElementById('d_omega').textContent = (state.omega * 180 / Math.PI).toFixed(1) + ' °/s';
+  document.getElementById('d_p').textContent = (p * 100).toFixed(1) + '%';
+  document.getElementById('d_above').textContent = aboveCm.toFixed(1) + ' cm';
+  document.getElementById('d_time').textContent = state.time.toFixed(2) + ' s';
+  document.getElementById('d_Ff').textContent = (forces.Ff * 1000).toFixed(2) + ' mN';
+  document.getElementById('d_Fc').textContent = (forces.Fc * 1000).toFixed(2) + ' mN';
+  document.getElementById('d_Fs').textContent = (forces.Fs * 1000).toFixed(3) + ' mN';
+  document.getElementById('d_Fy').textContent = (forces.Fy * 1000).toFixed(3) + ' mN';
+  document.getElementById('d_Fcf').textContent = (forces.Fc_f * 1000).toFixed(3) + ' mN';
+  document.getElementById('d_Fcl').textContent = (forces.Fc_l * 1000).toFixed(3) + ' mN';
+  document.getElementById('d_Fl').textContent = (forces.Fl * 1000).toFixed(2) + ' mN';
+}
+
+// ==================== 动画循环 ====================
+function animate(ts) {
+  animId = requestAnimationFrame(animate);
+  if (!running) return;
+
+  if (lastTs === null) lastTs = ts;
+  let elapsed = (ts - lastTs) / 1000 * speedMul;
+  lastTs = ts;
+  elapsed = Math.min(elapsed, 0.1);
+
+  readParams();
+  let forces = null;
+  const steps = Math.min(Math.ceil(elapsed / DT), MAX_STEPS);
+  for (let i = 0; i < steps; i++) forces = physicsStep(DT);
+
+  histTimer += elapsed;
+  if (histTimer >= HIST_INT) {
+    histTimer = 0;
+    forceHistory.push({ time: state.time, Ff:forces.Ff, Fc:forces.Fc, Fs:forces.Fs, Fy:forces.Fy, Fc_f:forces.Fc_f, Fc_l:forces.Fc_l, Fl:forces.Fl });
+    if (forceHistory.length > HIST_MAX) forceHistory.shift();
+  }
+
+  drawScene(forces);
+  drawChart();
+  updatePanel(forces);
+}
+
+// ==================== 控制 ====================
+function togglePlay() {
+  running = !running;
+  const btn = document.getElementById('btnPlay');
+  const badge = document.getElementById('statusBadge');
+  if (running) {
+    btn.textContent = ' 暂停'; btn.classList.add('paused');
+    badge.textContent = '运行中'; badge.className = 'status-badge status-running';
+    lastTs = null;
+    // 移动端: 点击运行时自动切到仿真 tab
+    if (window.innerWidth <= 768) {
+      const sidebar = document.getElementById('sidebar');
+      if (!sidebar.classList.contains('hidden-mobile')) {
+        mobileSwitch('sim');
+      }
+    }
+  } else {
+    btn.textContent = '▶ 运行'; btn.classList.remove('paused');
+    badge.textContent = '已暂停'; badge.className = 'status-badge status-paused';
+  }
+}
+
+function resetSim() {
+  readParams();
+  // 初始角度: 始终从接近竖直开始 (无水流时浮漂在锚点正上方)
+  state = { theta: Math.PI / 2 - 0.01, omega: 0, time: 0 };
+  forceHistory = [];
+  histTimer = 0;
+  lastTs = null;
+
+  const forces = computeForces(state.theta, computeP(state.theta));
+  drawScene(forces);
+  drawChart();
+  updatePanel(forces);
+  if (running) togglePlay();
+}
+
+function updateSpeed(val) {
+  speedMul = parseFloat(val);
+  document.getElementById('v_speed').textContent = speedMul.toFixed(1);
+}
+
+// 鱼线号数 → 直径(cm): 标准公式 直径(mm) = 0.05 × √(号数×10)
+function lineNoToDiam(lineNo) {
+  return 0.005 * Math.sqrt(lineNo * 10);
+}
+
+// 号数联动直径
+document.getElementById('p_lineNo').addEventListener('input', function() {
+  const lineNo = parseFloat(this.value);
+  if (!isNaN(lineNo) && lineNo > 0) {
+    const diamCm = lineNoToDiam(lineNo);
+    const dlInput = document.getElementById('p_dl');
+    dlInput.value = diamCm.toFixed(4);
+    document.getElementById('v_dl').textContent = dlInput.value;
+  }
+});
+
+document.querySelectorAll('.param-input').forEach(input => {
+  input.addEventListener('input', () => {
+    readParams();
+    if (!running) {
+      const forces = computeForces(state.theta, computeP(state.theta));
+      drawScene(forces);
+      updatePanel(forces);
+    }
+  });
+});
+
+// ==================== 移动端切换 ====================
+function mobileSwitch(view) {
+  const sidebar = document.getElementById('sidebar');
+  const main = document.getElementById('main');
+  const tabs = document.querySelectorAll('#mobile-tabs button');
+  const t = themes[currentTheme];
+  if (view === 'params') {
+    sidebar.classList.remove('hidden-mobile');
+    main.classList.add('hidden-mobile');
+    tabs[0].classList.add('active');
+    tabs[1].classList.remove('active');
+  } else {
+    sidebar.classList.add('hidden-mobile');
+    main.classList.remove('hidden-mobile');
+    tabs[0].classList.remove('active');
+    tabs[1].classList.add('active');
+    setTimeout(resizeCanvases, 50);
+  }
+  tabs.forEach(btn => {
+    btn.style.color = btn.classList.contains('active') ? t.valColor : t.textDim;
+    btn.style.borderBottomColor = btn.classList.contains('active') ? t.valColor : 'transparent';
+  });
+}
+
+// ==================== 初始化 ====================
+// 移动端默认显示仿真视图
+if (window.innerWidth <= 768) {
+  mobileSwitch('sim');
+}
+resizeCanvases();
+readParams();
+applyTheme('dark');
+resetSim();
+animId = requestAnimationFrame(animate);
+</script>
+</body>
+</html>

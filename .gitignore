@@ -1,0 +1,7 @@
+# 开发截图
+Snipaste_*.png
+受力分析图.png
+
+# 临时文件
+.venv/
+.claude/
