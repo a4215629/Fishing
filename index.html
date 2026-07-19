@@ -17,9 +17,24 @@
 
   .param-group { margin-bottom: 8px; }
   .param-label { font-size: 13px; color: #8899aa; display: flex; justify-content: space-between; margin-bottom: 3px; }
-  .param-label span.val { color: #4fc3f7; font-weight: 600; }
-  .param-input { width: 100%; padding: 5px 8px; background: #0f1a28; border: 1px solid #2a3a52; color: #e0e0e0; border-radius: 4px; font-size: 13px; outline: none; }
+  .param-input { width: 100%; padding: 5px 8px; background: #0f1a28; border: 1px solid #2a3a52; color: #e0e0e0; border-radius: 4px 0 0 4px; font-size: 13px; outline: none; }
   .param-input:focus { border-color: #e94560; }
+  /* 隐藏数字输入框默认箭头 */
+  .param-input::-webkit-outer-spin-button,
+  .param-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .param-input[type=number] { -moz-appearance: textfield; }
+
+  .stepper { display: flex; }
+  .stepper-btn {
+    width: 30px; padding: 5px 0; border: 1px solid #2a3a52;
+    background: #1a2a3a; color: #4fc3f7; font-size: 14px; font-weight: 700;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .stepper-btn:first-child { border-radius: 0; border-right: none; }
+  .stepper-btn:last-child { border-radius: 0 4px 4px 0; border-left: 1px solid #2a3a52; }
+  .stepper-btn:hover { background: #2a3a52; }
+  .stepper-btn:active { background: #e94560; color: #fff; }
 
   .data-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; border-bottom: 1px solid rgba(42,58,82,0.4); }
   .data-row .label { color: #8899aa; }
@@ -54,8 +69,16 @@
   }
   #overlay > * { pointer-events: auto; } /* 子元素恢复交互 */
 
+  #title-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px 6px 0;
+    background: var(--overlay-bg, rgba(15,26,40,0.88));
+    border-radius: 0 8px 0 0;
+    font-size: 13px;
+  }
+  #title-bar .panel-title { margin: 0; }
   #data-panel {
-    width: 400px; min-width: 400px; padding: 8px 14px;
+    padding: 6px 14px 8px;
     background: var(--overlay-bg, rgba(15,26,40,0.88));
     border-radius: 0 0 8px 0;
     display: flex; flex-direction: column;
@@ -71,8 +94,6 @@
   }
   #data-grid .data-row .label { white-space: nowrap; flex-shrink: 0; }
   #data-grid .data-row .value { text-align: right; font-variant-numeric: tabular-nums; }
-  #data-panel .panel-title { font-size: 12px; margin-bottom: 4px; }
-  #data-panel .status-badge { margin-bottom: 4px; font-size: 10px; }
 
   #chart-box {
     flex: 1; position: relative; min-width: 300px;
@@ -92,54 +113,63 @@
   .status-running { background: #4fc3f733; color: #4fc3f7; }
   .status-paused { background: #e9456033; color: #e94560; }
 
-  /* ---- 移动端切换按钮 ---- */
-  #mobile-tabs { display: none; }
+  /* ---- 移动端抽屉菜单 ---- */
+  #menu-btn { display: none; }
+  #drawer-backdrop { display: none; }
+  #drawer-close { display: none; }
 
   @media (max-width: 768px) {
-    body { flex-direction: column; height: 100dvh; }
+    body { flex-direction: row; height: 100dvh; }
 
-    #mobile-tabs {
-      display: flex; gap: 0; background: #1a2538; border-bottom: 2px solid #2a3a52;
-    }
-    #mobile-tabs button {
-      flex: 1; padding: 10px 0; border: none; background: transparent;
-      color: #8899aa; font-size: 14px; font-weight: 600; cursor: pointer;
-      border-bottom: 3px solid transparent; transition: all 0.2s;
-    }
-    #mobile-tabs button.active {
-      color: #4fc3f7; border-bottom-color: #4fc3f7; background: rgba(79,195,247,0.06);
+    /* 汉堡按钮 — 数据面板标题行内 */
+    #menu-btn {
+      display: flex;
+      width: 28px; height: 28px;
+      background: transparent; border: none;
+      color: #e0e0e0; font-size: 18px; cursor: pointer;
+      align-items: center; justify-content: center;
+      padding: 0; -webkit-tap-highlight-color: transparent;
+      flex-shrink: 0;
     }
 
+    /* 抽屉 */
     #sidebar {
-      width: 100%; min-width: 100%; max-height: none;
-      border-right: none; border-bottom: 1px solid #2a3a52;
-      flex: 1; overflow-y: auto;
+      position: fixed; top: 0; left: 0; bottom: 0;
+      width: 300px; z-index: 200;
+      border-right: none;
+      transform: translateX(-100%);
+      transition: transform 0.3s ease;
+      overflow-y: auto;
     }
-    #sidebar.hidden-mobile { display: none; }
+    #sidebar.open { transform: translateX(0); }
 
-    #main { flex: 1; min-height: 0; }
-    #main.hidden-mobile { display: none; }
-
-    /* 竖屏: 数据在上，图表在下 */
-    #overlay { flex-direction: column; height: 26%; min-height: 120px; }
-    #data-panel {
-      width: 100%; min-width: unset; border-radius: 0;
-      flex-direction: row; flex-wrap: wrap; gap: 0 12px;
-      padding: 6px 10px; align-items: center;
+    /* 遮罩 */
+    #drawer-backdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5); z-index: 150;
     }
-    #data-panel .panel-title { width: 100%; margin-bottom: 0; flex-shrink: 0; }
-    #data-panel .status-badge { flex-shrink: 0; margin-bottom: 0; }
-    #data-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; column-gap: 25px; row-gap: 1px; width: 100%; }
+    #drawer-backdrop.show { display: block; }
+
+    /* 关闭按钮 */
+    #drawer-close {
+      display: flex; position: absolute; top: 12px; right: 12px;
+      width: 36px; height: 36px; border-radius: 8px;
+      background: rgba(233,69,96,0.8); border: none;
+      color: #fff; font-size: 18px; cursor: pointer;
+      align-items: center; justify-content: center;
+    }
+
+    /* 叠加层适配 */
+    #overlay { flex-direction: column; height: auto; min-height: auto; max-height: 40%; }
+    #title-bar { border-radius: 0; padding: 6px 10px 6px 0; }
+    #title-bar .panel-title { margin: 0; }
+    #data-panel { border-radius: 0; padding: 4px 10px 6px; }
+    #data-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 25px; row-gap: 1px; }
     #data-grid .data-row { font-size: 12px; display: flex; justify-content: space-between; gap: 3px; }
     #data-grid .data-row .label { white-space: nowrap; flex-shrink: 0; }
     #data-grid .data-row .value { text-align: right; }
-    #chart-box { flex: 1; border-radius: 0; margin-left: 0; min-width: unset; }
     .legend { top: 2px; right: 4px; }
     .legend-item { font-size: 9px; padding: 1px 4px; }
-
-    .panel-section { padding: 10px 12px; }
-    .controls { padding: 8px 12px; }
-  }
 
     .panel-section { padding: 10px 12px; }
     .controls { padding: 8px 12px; }
@@ -148,28 +178,26 @@
 </head>
 <body>
 
-<div id="mobile-tabs">
-  <button class="active" onclick="mobileSwitch('params')">📊 参数</button>
-  <button onclick="mobileSwitch('sim')">🎣 仿真</button>
-</div>
+<div id="drawer-backdrop" onclick="toggleDrawer()"></div>
 
 <div id="sidebar">
+  <button id="drawer-close" onclick="toggleDrawer()">✕</button>
   <div class="panel-section">
     <div class="panel-title">🎣 浮漂参数</div>
     <div class="param-group">
-      <div class="param-label">浮漂长度 L_f (cm) <span class="val" id="v_Lf">20</span></div>
+      <div class="param-label">浮漂长度 L_f (cm)</div>
       <input class="param-input" type="number" id="p_Lf" value="20" step="1" min="5" max="50">
     </div>
     <div class="param-group">
-      <div class="param-label">排水量 m_displaced (g) <span class="val" id="v_md">3.2</span></div>
+      <div class="param-label">排水量 m_displaced (g)</div>
       <input class="param-input" type="number" id="p_md" value="3.2" step="0.1" min="0.5" max="20">
     </div>
     <div class="param-group">
-      <div class="param-label">浮漂直径 d_f (cm) <span class="val" id="v_df">0.45</span></div>
+      <div class="param-label">浮漂直径 d_f (cm)</div>
       <input class="param-input" type="number" id="p_df" value="0.45" step="0.01" min="0.1" max="2">
     </div>
     <div class="param-group">
-      <div class="param-label">浮漂自重 m_float (g) <span class="val" id="v_mf">0.2</span></div>
+      <div class="param-label">浮漂自重 m_float (g)</div>
       <input class="param-input" type="number" id="p_mf" value="0.2" step="0.1" min="0" max="5">
     </div>
   </div>
@@ -177,19 +205,19 @@
   <div class="panel-section">
     <div class="panel-title"> 鱼线参数</div>
     <div class="param-group">
-      <div class="param-label">鱼线号数 <span class="val" id="v_lineNo">1.5</span></div>
+      <div class="param-label">鱼线号数</div>
       <input class="param-input" type="number" id="p_lineNo" value="1.5" step="0.1" min="0.1" max="5" title="号数决定直径: d(mm) = 0.05 × √(号数×10)">
     </div>
     <div class="param-group">
-      <div class="param-label">鱼线直径 d_l (cm) <span class="val" id="v_dl">0.0205</span> <span style="font-size:11px;color:#8899aa">（由号数自动换算）</span></div>
+      <div class="param-label">鱼线直径 d_l (cm) <span style="font-size:11px;color:#8899aa">（由号数自动换算）</span></div>
       <input class="param-input" type="number" id="p_dl" value="0.0205" step="0.001" min="0.005" max="0.1" title="由号数自动换算, 也可手动修改">
     </div>
     <div class="param-group">
-      <div class="param-label">鱼线长度 L_l (cm) <span class="val" id="v_Ll">140</span></div>
+      <div class="param-label">鱼线长度 L_l (cm)</div>
       <input class="param-input" type="number" id="p_Ll" value="140" step="10" min="20" max="500">
     </div>
     <div class="param-group">
-      <div class="param-label">锚点水深 D (cm) <span class="val" id="v_D">150</span></div>
+      <div class="param-label">锚点水深 D (cm)</div>
       <input class="param-input" type="number" id="p_D" value="150" step="10" min="10" max="500">
     </div>
   </div>
@@ -197,19 +225,19 @@
   <div class="panel-section">
     <div class="panel-title"> 流体力学参数</div>
     <div class="param-group">
-      <div class="param-label">水流速度 v (m/s) <span class="val" id="v_v">0.1</span></div>
+      <div class="param-label">水流速度 v (m/s)</div>
       <input class="param-input" type="number" id="p_v" value="0.1" step="0.1" min="0" max="5">
     </div>
     <div class="param-group">
-      <div class="param-label">浮漂阻力系数 Cd_f <span class="val" id="v_Cdf">0.4</span></div>
+      <div class="param-label">浮漂阻力系数 Cd_f</div>
       <input class="param-input" type="number" id="p_Cdf" value="0.4" step="0.1" min="0.1" max="3" title="浮漂侧面迎流(纺锤形) Cd≈0.3~0.5">
     </div>
     <div class="param-group">
-      <div class="param-label">鱼线阻力系数 Cd_l <span class="val" id="v_Cdl">0.7</span></div>
+      <div class="param-label">鱼线阻力系数 Cd_l</div>
       <input class="param-input" type="number" id="p_Cdl" value="0.7" step="0.1" min="0.1" max="3" title="细圆柱横向绕流, 弯曲后等效 Cd≈0.5~0.8">
     </div>
     <div class="param-group">
-      <div class="param-label">水密度 ρ (kg/m³) <span class="val" id="v_rho">1000</span></div>
+      <div class="param-label">水密度 ρ (kg/m³)</div>
       <input class="param-input" type="number" id="p_rho" value="1000" step="10" min="900" max="1100">
     </div>
   </div>
@@ -239,22 +267,27 @@
 <div id="main">
   <div id="canvas-wrap"><canvas id="simCanvas"></canvas></div>
   <div id="overlay">
-    <div id="data-panel">
-      <div class="panel-title"> 实时数据</div>
+    <div id="title-bar">
+      <button id="menu-btn" onclick="toggleDrawer()">☰</button>
+      <span>实时数据</span>
       <span class="status-badge status-paused" id="statusBadge">已暂停</span>
+    </div>
+    <div id="data-panel">
       <div id="data-grid">
+        <div class="data-row"><span class="label">水流速度 v</span><span class="value" id="d_v" style="color:#00bcd4">0.1 m/s</span></div>
+        <div class="data-row"><span class="label">状态</span><span class="value" id="d_status" style="color:#ffd740">—</span></div>
         <div class="data-row"><span class="label">角度 θ</span><span class="value" id="d_theta" style="color:#4fc3f7">90.0°</span></div>
         <div class="data-row"><span class="label">角速度 ω</span><span class="value" id="d_omega" style="color:#ffd740">0.0 °/s</span></div>
         <div class="data-row"><span class="label">浸入比例 p</span><span class="value" id="d_p" style="color:#66bb6a">0.0%</span></div>
         <div class="data-row"><span class="label">水上长度</span><span class="value" id="d_above" style="color:#39FF14">0.0 cm</span></div>
         <div class="data-row"><span class="label">模拟时间 t</span><span class="value" id="d_time" style="color:#8899aa">0.00 s</span></div>
-        <div class="data-row"><span class="label">浮力 Ff</span><span class="value" id="d_Ff" style="color:#4fc3f7">0.00 mN</span></div>
-        <div class="data-row"><span class="label">总冲力 Fc</span><span class="value" id="d_Fc" style="color:#ef5350">0.00 mN</span></div>
-        <div class="data-row"><span class="label">上升力 Fs</span><span class="value" id="d_Fs" style="color:#66bb6a">0.00 mN</span></div>
-        <div class="data-row"><span class="label">下压力 Fy</span><span class="value" id="d_Fy" style="color:#ffa726">0.00 mN</span></div>
-        <div class="data-row"><span class="label">浮漂冲力 Fc_f</span><span class="value" id="d_Fcf" style="color:#ef9a9a">0.00 mN</span></div>
-        <div class="data-row"><span class="label">鱼线冲力 Fc_l</span><span class="value" id="d_Fcl" style="color:#e53935">0.00 mN</span></div>
-        <div class="data-row"><span class="label">线拉力 Fl</span><span class="value" id="d_Fl" style="color:#ce93d8">0.00 mN</span></div>
+        <div class="data-row"><span class="label">浮力 Fb</span><span class="value" id="d_Fb" style="color:#4fc3f7">0.00 mN</span></div>
+        <div class="data-row"><span class="label">流体总阻力 Fd</span><span class="value" id="d_Fd" style="color:#ef5350">0.00 mN</span></div>
+        <div class="data-row"><span class="label">阻力升力分量 Fu</span><span class="value" id="d_Fu" style="color:#66bb6a">0.00 mN</span></div>
+        <div class="data-row"><span class="label">阻力下沉分量 Fv</span><span class="value" id="d_Fv" style="color:#ffa726">0.00 mN</span></div>
+        <div class="data-row"><span class="label">浮漂阻力 Fdf</span><span class="value" id="d_Fdf" style="color:#ef9a9a">0.00 mN</span></div>
+        <div class="data-row"><span class="label">鱼线阻力 Fdl</span><span class="value" id="d_Fdl" style="color:#e53935">0.00 mN</span></div>
+        <div class="data-row"><span class="label">线张力 T</span><span class="value" id="d_T" style="color:#ce93d8">0.00 mN</span></div>
       </div>
     </div>
     <div id="chart-box">
@@ -288,8 +321,8 @@ const decoFish = [
 ];
 let histTimer = 0, forceHistory = [];
 
-const curveVis = { Ff:true, Fc:true, Fs:true, Fy:true, Fc_f:true, Fc_l:true, Fl:true };
-const curveLbl = { Ff:'浮力 Ff', Fc:'总冲力 Fc', Fs:'上升力 Fs', Fy:'下压力 Fy', Fc_f:'浮漂冲力 Fc_f', Fc_l:'鱼线冲力 Fc_l', Fl:'线拉力 Fl' };
+const curveVis = { Fb:true, Fd:true, Fu:true, Fv:true, Fdf:true, Fdl:true, T:true };
+const curveLbl = { Fb:'浮力 Fb', Fd:'流体总阻力 Fd', Fu:'阻力升力分量 Fu', Fv:'阻力下沉分量 Fv', Fdf:'浮漂阻力 Fdf', Fdl:'鱼线阻力 Fdl', T:'线张力 T' };
 
 // ==================== 主题配色 ====================
 const themes = {
@@ -299,8 +332,8 @@ const themes = {
     text:'#e0e8f0', textDim:'#8899aa', accent:'#e94560', valColor:'#4fc3f7',
     water:'#2196f3', waterBg:'rgba(33,150,243,0.10)', line:'#bbc8d8', lineCurve:'#8899aa',
     anchor:'#667788', anchorStroke:'#8899aa',
-    Ff:'#4fc3f7', Fc:'#ef5350', Fs:'#66bb6a', Fy:'#ffa726',
-    Fc_f:'#ef9a9a', Fc_l:'#e53935', Fl:'#ce93d8',
+    Fb:'#4fc3f7', Fd:'#ef5350', Fu:'#66bb6a', Fv:'#ffa726',
+    Fdf:'#ef9a9a', Fdl:'#e53935', T:'#ce93d8',
     angle:'#ffd740', current:'#00bcd4',
     statusBg:'rgba(21,32,48,0.9)', gridLine:'rgba(255,255,255,0.06)', axisLine:'rgba(255,255,255,0.18)',
     chartBg:'#152030',
@@ -313,8 +346,8 @@ const themes = {
     text:'#1e293b', textDim:'#64748b', accent:'#c0392b', valColor:'#1976d2',
     water:'#1976d2', waterBg:'rgba(25,118,210,0.06)', line:'#546e7a', lineCurve:'#78909c',
     anchor:'#546e7a', anchorStroke:'#78909c',
-    Ff:'#1976d2', Fc:'#c62828', Fs:'#2e7d32', Fy:'#e65100',
-    Fc_f:'#e53935', Fc_l:'#b71c1c', Fl:'#7b1fa2',
+    Fb:'#1976d2', Fd:'#c62828', Fu:'#2e7d32', Fv:'#e65100',
+    Fdf:'#e53935', Fdl:'#b71c1c', T:'#7b1fa2',
     angle:'#f57f17', current:'#00897b',
     statusBg:'rgba(240,243,248,0.92)', gridLine:'rgba(0,0,0,0.06)', axisLine:'rgba(0,0,0,0.2)',
     chartBg:'#fafbfd',
@@ -327,8 +360,8 @@ const themes = {
     text:'#d8f0e0', textDim:'#7ab88e', accent:'#4ade80', valColor:'#6ee7b7',
     water:'#2dd4a8', waterBg:'rgba(45,212,168,0.08)', line:'#8fbfa0', lineCurve:'#5a9a72',
     anchor:'#6b9f7b', anchorStroke:'#8fbfa0',
-    Ff:'#6ee7b7', Fc:'#f87171', Fs:'#34d399', Fy:'#fbbf24',
-    Fc_f:'#fca5a5', Fc_l:'#ef4444', Fl:'#c084fc',
+    Fb:'#6ee7b7', Fd:'#f87171', Fu:'#34d399', Fv:'#fbbf24',
+    Fdf:'#fca5a5', Fdl:'#ef4444', T:'#c084fc',
     angle:'#fde047', current:'#5eead4',
     statusBg:'rgba(16,40,24,0.92)', gridLine:'rgba(100,220,150,0.07)', axisLine:'rgba(100,220,150,0.18)',
     chartBg:'#0e2416',
@@ -341,8 +374,8 @@ const themes = {
     text:'#ffffff', textDim:'#aaaaaa', accent:'#ff4444', valColor:'#00ffff',
     water:'#0088ff', waterBg:'rgba(0,136,255,0.10)', line:'#eeeeee', lineCurve:'#cccccc',
     anchor:'#cccccc', anchorStroke:'#ffffff',
-    Ff:'#00ffff', Fc:'#ff4444', Fs:'#44ff44', Fy:'#ffaa00',
-    Fc_f:'#ff8888', Fc_l:'#ff0000', Fl:'#ff44ff',
+    Fb:'#00ffff', Fd:'#ff4444', Fu:'#44ff44', Fv:'#ffaa00',
+    Fdf:'#ff8888', Fdl:'#ff0000', T:'#ff44ff',
     angle:'#ffff00', current:'#00ff88',
     statusBg:'rgba(15,15,24,0.92)', gridLine:'rgba(255,255,255,0.08)', axisLine:'rgba(255,255,255,0.3)',
     chartBg:'#08080e',
@@ -355,8 +388,8 @@ const themes = {
     text:'#f0e8e0', textDim:'#b0907a', accent:'#ff7043', valColor:'#ffca28',
     water:'#5c9bc4', waterBg:'rgba(92,155,196,0.10)', line:'#bcaaa4', lineCurve:'#8d6e63',
     anchor:'#8d6e63', anchorStroke:'#a1887f',
-    Ff:'#5c9bc4', Fc:'#ef5350', Fs:'#66bb6a', Fy:'#ffa726',
-    Fc_f:'#ef9a9a', Fc_l:'#e53935', Fl:'#ab47bc',
+    Fb:'#5c9bc4', Fd:'#ef5350', Fu:'#66bb6a', Fv:'#ffa726',
+    Fdf:'#ef9a9a', Fdl:'#e53935', T:'#ab47bc',
     angle:'#ffca28', current:'#26c6da',
     statusBg:'rgba(40,24,15,0.9)', gridLine:'rgba(255,200,150,0.06)', axisLine:'rgba(255,200,150,0.18)',
     chartBg:'#28180f',
@@ -370,7 +403,7 @@ let curveClr = {};  // 由 applyTheme 初始化
 function applyTheme(name) {
   currentTheme = name;
   const t = themes[name];
-  curveClr = { Ff:t.Ff, Fc:t.Fc, Fs:t.Fs, Fy:t.Fy, Fc_f:t.Fc_f, Fc_l:t.Fc_l, Fl:t.Fl };
+  curveClr = { Fb:t.Fb, Fd:t.Fd, Fu:t.Fu, Fv:t.Fv, Fdf:t.Fdf, Fdl:t.Fdl, T:t.T };
 
   // 更新 CSS 主题色
   document.body.style.background = t.bg;
@@ -383,32 +416,29 @@ function applyTheme(name) {
   const overlayBg = t.bg === '#f5f7fa' ? 'rgba(240,243,248,0.92)' : t.chartBg;
   document.documentElement.style.setProperty('--overlay-bg', overlayBg);
 
+  // 标题栏
+  const tb = document.getElementById('title-bar');
+  if (tb) {
+    const tbTitle = tb.querySelector('span:not(.status-badge)');
+    if (tbTitle) tbTitle.style.color = t.accent;
+  }
+
   // 数据面板
   const dp = document.getElementById('data-panel');
   if (dp) {
     dp.querySelectorAll('.data-row .label').forEach(el => { el.style.color = t.textDim; });
-    dp.querySelector('.panel-title').style.color = t.accent;
   }
 
-  // 移动端标签栏
-  const mobileTabs = document.getElementById('mobile-tabs');
-  if (mobileTabs) {
-    mobileTabs.style.background = t.sidebar;
-    mobileTabs.style.borderColor = t.border;
-    mobileTabs.querySelectorAll('button').forEach(btn => {
-      btn.style.color = t.textDim;
-    });
-    const activeBtn = mobileTabs.querySelector('button.active');
-    if (activeBtn) {
-      activeBtn.style.color = t.valColor;
-      activeBtn.style.borderBottomColor = t.valColor;
-    }
+  // 移动端汉堡按钮
+  const menuBtn = document.getElementById('menu-btn');
+  if (menuBtn) {
+    menuBtn.style.color = t.text;
   }
 
   // 更新面板样式
   document.querySelectorAll('.panel-section').forEach(el => { el.style.borderColor = t.border; });
   document.querySelectorAll('.param-input').forEach(el => { el.style.background = t.panelBg; el.style.borderColor = t.border; el.style.color = t.text; });
-  document.querySelectorAll('.param-label .val').forEach(el => { el.style.color = t.valColor; });
+  document.querySelectorAll('.stepper-btn').forEach(el => { el.style.background = t.sidebar; el.style.borderColor = t.border; el.style.color = t.valColor; });
   document.querySelectorAll('.param-label').forEach(el => { el.style.color = t.textDim; });
   document.querySelectorAll('.panel-title').forEach(el => { el.style.color = t.accent; });
   document.querySelectorAll('.data-row').forEach(el => { el.style.borderColor = t.border; });
@@ -423,8 +453,8 @@ function applyTheme(name) {
   document.getElementById('btnReset').style.color = t.text;
 
   // 更新数据面板数值颜色
-  const colorMap = { d_Ff:t.Ff, d_Fc:t.Fc, d_Fs:t.Fs, d_Fy:t.Fy, d_Fcf:t.Fc_f, d_Fcl:t.Fc_l, d_Fl:t.Fl,
-    d_theta:t.valColor, d_omega:t.angle, d_p:t.Fs, d_above:t.aboveWater, d_time:t.textDim };
+  const colorMap = { d_Fb:t.Fb, d_Fd:t.Fd, d_Fu:t.Fu, d_Fv:t.Fv, d_Fdf:t.Fdf, d_Fdl:t.Fdl, d_T:t.T,
+    d_theta:t.valColor, d_omega:t.angle, d_p:t.Fu, d_above:t.aboveWater, d_time:t.textDim };
   for (const [id, clr] of Object.entries(colorMap)) {
     const el = document.getElementById(id);
     if (el) el.style.color = clr;
@@ -457,10 +487,6 @@ function readParams() {
   params.Cdf = g('p_Cdf');
   params.Cdl = g('p_Cdl');
   params.rho = g('p_rho');
-  ['p_Lf','p_md','p_df','p_mf','p_lineNo','p_dl','p_Ll','p_D','p_v','p_Cdf','p_Cdl','p_rho'].forEach(id => {
-    const el = document.getElementById('v_' + id.substring(2));
-    if (el) el.textContent = document.getElementById(id).value;
-  });
 }
 
 // ==================== 核心物理 ====================
@@ -499,8 +525,8 @@ function computeP(theta) {
 function computeForces(theta, p) {
   const { Lf, md, df, dl, Ll, v, Cdf, Cdl, rho } = params;
 
-  const Ff_max = md * G;
-  const Ff = Ff_max * p;
+  const Fb_max = md * G;
+  const Fb = Fb_max * p;
 
   const cosT = Math.cos(theta);
   const sinT = Math.sin(theta);
@@ -510,22 +536,22 @@ function computeForces(theta, p) {
   const Al = dl * Ll * sinT;      // 鱼线: 全长 × sinθ = 竖直投影
 
   // 冲力
-  const Fc_f = 0.5 * rho * v * v * Cdf * Af;
-  const Fc_l = 0.5 * rho * v * v * Cdl * Al;
-  const Fc = Fc_f + Fc_l;
+  const Fdf = 0.5 * rho * v * v * Cdf * Af;
+  const Fdl = 0.5 * rho * v * v * Cdl * Al;
+  const Fd = Fdf + Fdl;
 
-  const Fs = Ff * cosT;    // 上升力 (垂直鱼线方向)
-  const Fy = Fc * sinT;    // 下压力 (垂直鱼线方向)
+  const Fu = Fb * cosT;    // 上升力 (垂直鱼线方向)
+  const Fv = Fd * sinT;    // 下压力 (垂直鱼线方向)
 
   // 沿鱼线方向 → 线拉力
-  const Ff_para = Ff * sinT;
-  const Fc_para = Fc * cosT;
-  const Fl = Math.abs(Ff_para - Fc_para);
+  const Fb_para = Fb * sinT;
+  const Fd_para = Fd * cosT;
+  const T = Math.abs(Fb_para - Fd_para);
 
   // 垂直鱼线方向净力 (正 = θ增大/浮漂上升)
-  const F_perp = Fs - Fy;
+  const F_perp = Fu - Fv;
 
-  return { Ff, Fc, Fs, Fy, Fc_f, Fc_l, Fl, F_perp, Ff_max };
+  return { Fb, Fd, Fu, Fv, Fdf, Fdl, T, F_perp, Fb_max };
 }
 
 /**
@@ -565,12 +591,32 @@ function resizeCanvases() {
   simCanvas.height = sw.clientHeight * devicePixelRatio;
   simCanvas.style.width = sw.clientWidth + 'px';
   simCanvas.style.height = sw.clientHeight + 'px';
+
+  const overlay = document.getElementById('overlay');
+  const dp = document.getElementById('data-panel');
   const cb = document.getElementById('chart-box');
-  if (cb) {
-    chartCanvas.width = cb.clientWidth * devicePixelRatio;
+  if (!overlay || !dp || !cb) return;
+
+  overlay.style.display = 'flex';
+  // 先计算可用宽度: 叠加层总宽 - 数据面板400px - 间距1px
+  const overlayW = overlay.clientWidth;
+  const availChartW = overlayW - 400 - 1;
+
+  if (availChartW >= 400) {
+    // 模式1: 宽度足够 — 数据固定400px, 图表用剩余宽度
+    dp.style.width = '400px';
+    dp.style.minWidth = '400px';
+    cb.style.display = 'block';
+    const actualChartW = cb.clientWidth;
+    chartCanvas.width = actualChartW * devicePixelRatio;
     chartCanvas.height = cb.clientHeight * devicePixelRatio;
-    chartCanvas.style.width = cb.clientWidth + 'px';
+    chartCanvas.style.width = actualChartW + 'px';
     chartCanvas.style.height = cb.clientHeight + 'px';
+  } else {
+    // 模式2: 宽度不足 — 隐藏图表, 数据占满全宽
+    dp.style.width = '100%';
+    dp.style.minWidth = 'unset';
+    cb.style.display = 'none';
   }
 }
 let prevMobile = window.innerWidth <= 768;
@@ -580,11 +626,9 @@ window.addEventListener('resize', () => {
   if (isMobile !== prevMobile) {
     prevMobile = isMobile;
     if (isMobile) {
-      mobileSwitch('sim');
-    } else {
-      // 回到桌面模式，恢复两个面板
-      document.getElementById('sidebar').classList.remove('hidden-mobile');
-      document.getElementById('main').classList.remove('hidden-mobile');
+      // 切换到移动端时关闭抽屉
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('drawer-backdrop').classList.remove('show');
     }
   }
 });
@@ -645,29 +689,6 @@ function drawScene(forces) {
   ctx.fillStyle = t.water;
   ctx.font = `${12 * dpr}px "Microsoft YaHei"`;
   ctx.fillText('水面', 8 * dpr, waterY - 6 * dpr);
-
-  // 水流方向指示 (叠加层下方, 水面之上)
-  if (v > 0.01) {
-    const arrowY = H * 0.36;
-    const arrowStart = 15 * dpr;
-    const arrowEnd = arrowStart + 70 * dpr;
-    ctx.strokeStyle = t.current;
-    ctx.fillStyle = t.current;
-    ctx.lineWidth = 2.5 * dpr;
-    ctx.font = `bold ${16 * dpr}px "Microsoft YaHei"`;
-    ctx.beginPath();
-    ctx.moveTo(arrowStart, arrowY);
-    ctx.lineTo(arrowEnd, arrowY);
-    ctx.stroke();
-    const hl = 9 * dpr;
-    ctx.beginPath();
-    ctx.moveTo(arrowEnd, arrowY);
-    ctx.lineTo(arrowEnd - hl, arrowY - hl * 0.5);
-    ctx.lineTo(arrowEnd - hl, arrowY + hl * 0.5);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillText(`水流 ${v} m/s →`, arrowEnd + 8 * dpr, arrowY + 5 * dpr);
-  }
 
   // ---- 装饰鱼群 ----
   const fishAreaTop = waterY + 15 * dpr;
@@ -840,17 +861,17 @@ function drawScene(forces) {
 
   // 计算所有箭头的原始终点
   const arrows = [];
-  if (forces.Ff > 1e-6)
-    arrows.push({ fx:cx, fy:cy, tx:cx, ty:cy - forces.Ff*fScale, color:t.Ff, label:`Ff=${(forces.Ff*1000).toFixed(1)}`, lox:5*dpr, loy:-12*dpr });
-  if (forces.Fc > 1e-6)
-    arrows.push({ fx:cx, fy:cy, tx:cx + forces.Fc*fScale, ty:cy, color:t.Fc, label:`Fc=${(forces.Fc*1000).toFixed(1)}`, lox:6*dpr, loy:-12*dpr });
-  if (forces.Fs > 1e-6) {
-    const len = forces.Fs * fScale;
-    arrows.push({ fx:cx, fy:cy, tx:cx - len*Math.sin(theta), ty:cy - len*Math.cos(theta), color:t.Fs, label:`Fs=${(forces.Fs*1000).toFixed(2)}`, lox:-30*dpr, loy:-8*dpr });
+  if (forces.Fb > 1e-6)
+    arrows.push({ fx:cx, fy:cy, tx:cx, ty:cy - forces.Fb*fScale, color:t.Fb, label:`Fb=${(forces.Fb*1000).toFixed(1)}`, lox:5*dpr, loy:-12*dpr });
+  if (forces.Fd > 1e-6)
+    arrows.push({ fx:cx, fy:cy, tx:cx + forces.Fd*fScale, ty:cy, color:t.Fd, label:`Fd=${(forces.Fd*1000).toFixed(1)}`, lox:6*dpr, loy:-12*dpr });
+  if (forces.Fu > 1e-6) {
+    const len = forces.Fu * fScale;
+    arrows.push({ fx:cx, fy:cy, tx:cx - len*Math.sin(theta), ty:cy - len*Math.cos(theta), color:t.Fu, label:`Fu=${(forces.Fu*1000).toFixed(2)}`, lox:-30*dpr, loy:-8*dpr });
   }
-  if (forces.Fy > 1e-6) {
-    const len = forces.Fy * fScale;
-    arrows.push({ fx:cx, fy:cy, tx:cx + len*Math.sin(theta), ty:cy + len*Math.cos(theta), color:t.Fy, label:`Fy=${(forces.Fy*1000).toFixed(2)}`, lox:5*dpr, loy:12*dpr });
+  if (forces.Fv > 1e-6) {
+    const len = forces.Fv * fScale;
+    arrows.push({ fx:cx, fy:cy, tx:cx + len*Math.sin(theta), ty:cy + len*Math.cos(theta), color:t.Fv, label:`Fv=${(forces.Fv*1000).toFixed(2)}`, lox:5*dpr, loy:12*dpr });
   }
 
   // 计算缩放比例
@@ -890,20 +911,6 @@ function drawScene(forces) {
     }
   }
   for (const a of arrows) drawArrow(a);
-
-  // 状态指示 (叠加层下方, 右上角)
-  const netP = forces.Fs - forces.Fy;
-  const isBalance = Math.abs(netP) < forces.Fc * 0.01;
-  const statusText = isBalance ? '⚖ 平衡' : (netP > 0 ? '↑ 上升' : '↓ 下沉');
-  const statusClr = isBalance ? t.angle : (netP > 0 ? t.aboveWater : t.Fc);
-  ctx.fillStyle = statusClr;
-  ctx.font = `bold ${16 * dpr}px "Microsoft YaHei"`;
-  ctx.fillText(statusText, W - 120 * dpr, H * 0.36);
-
-  const aboveCm = Math.max(0, ((Ll + Lf) * Math.sin(theta) - D)) * 100;
-  ctx.fillStyle = t.textDim;
-  ctx.font = `${14 * dpr}px "Microsoft YaHei"`;
-  ctx.fillText(`浸入: ${(p*100).toFixed(1)}%  水上: ${aboveCm.toFixed(1)}cm`, W - 220 * dpr, H * 0.36 + 20 * dpr);
 }
 
 // ==================== 绘制图表 ====================
@@ -998,22 +1005,31 @@ function buildLegend() {
 
 // ==================== 更新面板 ====================
 function updatePanel(forces) {
-  const { Lf, Ll, D } = params;
+  const { Lf, Ll, D, v } = params;
   const p = computeP(state.theta);
   const aboveCm = Math.max(0, ((Ll + Lf) * Math.sin(state.theta) - D)) * 100;
 
+  // 状态判断
+  const netP = forces.Fu - forces.Fv;
+  const isBalance = Math.abs(netP) < forces.Fd * 0.01;
+  const statusText = isBalance ? '⚖ 平衡' : (netP > 0 ? '↑ 上升' : '↓ 下沉');
+  const statusEl = document.getElementById('d_status');
+  statusEl.textContent = statusText;
+  statusEl.style.color = isBalance ? '#ffd740' : (netP > 0 ? '#39FF14' : '#ef5350');
+
+  document.getElementById('d_v').textContent = v.toFixed(1) + ' m/s';
   document.getElementById('d_theta').textContent = (state.theta * 180 / Math.PI).toFixed(1) + '°';
   document.getElementById('d_omega').textContent = (state.omega * 180 / Math.PI).toFixed(1) + ' °/s';
   document.getElementById('d_p').textContent = (p * 100).toFixed(1) + '%';
   document.getElementById('d_above').textContent = aboveCm.toFixed(1) + ' cm';
   document.getElementById('d_time').textContent = state.time.toFixed(2) + ' s';
-  document.getElementById('d_Ff').textContent = (forces.Ff * 1000).toFixed(2) + ' mN';
-  document.getElementById('d_Fc').textContent = (forces.Fc * 1000).toFixed(2) + ' mN';
-  document.getElementById('d_Fs').textContent = (forces.Fs * 1000).toFixed(3) + ' mN';
-  document.getElementById('d_Fy').textContent = (forces.Fy * 1000).toFixed(3) + ' mN';
-  document.getElementById('d_Fcf').textContent = (forces.Fc_f * 1000).toFixed(3) + ' mN';
-  document.getElementById('d_Fcl').textContent = (forces.Fc_l * 1000).toFixed(3) + ' mN';
-  document.getElementById('d_Fl').textContent = (forces.Fl * 1000).toFixed(2) + ' mN';
+  document.getElementById('d_Fb').textContent = (forces.Fb * 1000).toFixed(2) + ' mN';
+  document.getElementById('d_Fd').textContent = (forces.Fd * 1000).toFixed(2) + ' mN';
+  document.getElementById('d_Fu').textContent = (forces.Fu * 1000).toFixed(3) + ' mN';
+  document.getElementById('d_Fv').textContent = (forces.Fv * 1000).toFixed(3) + ' mN';
+  document.getElementById('d_Fdf').textContent = (forces.Fdf * 1000).toFixed(3) + ' mN';
+  document.getElementById('d_Fdl').textContent = (forces.Fdl * 1000).toFixed(3) + ' mN';
+  document.getElementById('d_T').textContent = (forces.T * 1000).toFixed(2) + ' mN';
 }
 
 // ==================== 动画循环 ====================
@@ -1034,7 +1050,7 @@ function animate(ts) {
   histTimer += elapsed;
   if (histTimer >= HIST_INT) {
     histTimer = 0;
-    forceHistory.push({ time: state.time, Ff:forces.Ff, Fc:forces.Fc, Fs:forces.Fs, Fy:forces.Fy, Fc_f:forces.Fc_f, Fc_l:forces.Fc_l, Fl:forces.Fl });
+    forceHistory.push({ time: state.time, Fb:forces.Fb, Fd:forces.Fd, Fu:forces.Fu, Fv:forces.Fv, Fdf:forces.Fdf, Fdl:forces.Fdl, T:forces.T });
     if (forceHistory.length > HIST_MAX) forceHistory.shift();
   }
 
@@ -1052,11 +1068,11 @@ function togglePlay() {
     btn.textContent = ' 暂停'; btn.classList.add('paused');
     badge.textContent = '运行中'; badge.className = 'status-badge status-running';
     lastTs = null;
-    // 移动端: 点击运行时自动切到仿真 tab
+    // 移动端: 点击运行时自动收起抽屉
     if (window.innerWidth <= 768) {
       const sidebar = document.getElementById('sidebar');
-      if (!sidebar.classList.contains('hidden-mobile')) {
-        mobileSwitch('sim');
+      if (sidebar.classList.contains('open')) {
+        toggleDrawer();
       }
     }
   } else {
@@ -1097,7 +1113,6 @@ document.getElementById('p_lineNo').addEventListener('input', function() {
     const diamCm = lineNoToDiam(lineNo);
     const dlInput = document.getElementById('p_dl');
     dlInput.value = diamCm.toFixed(4);
-    document.getElementById('v_dl').textContent = dlInput.value;
   }
 });
 
@@ -1112,39 +1127,60 @@ document.querySelectorAll('.param-input').forEach(input => {
   });
 });
 
-// ==================== 移动端切换 ====================
-function mobileSwitch(view) {
+// ==================== 抽屉菜单 ====================
+function toggleDrawer() {
   const sidebar = document.getElementById('sidebar');
-  const main = document.getElementById('main');
-  const tabs = document.querySelectorAll('#mobile-tabs button');
-  const t = themes[currentTheme];
-  if (view === 'params') {
-    sidebar.classList.remove('hidden-mobile');
-    main.classList.add('hidden-mobile');
-    tabs[0].classList.add('active');
-    tabs[1].classList.remove('active');
-  } else {
-    sidebar.classList.add('hidden-mobile');
-    main.classList.remove('hidden-mobile');
-    tabs[0].classList.remove('active');
-    tabs[1].classList.add('active');
-    setTimeout(resizeCanvases, 50);
-  }
-  tabs.forEach(btn => {
-    btn.style.color = btn.classList.contains('active') ? t.valColor : t.textDim;
-    btn.style.borderBottomColor = btn.classList.contains('active') ? t.valColor : 'transparent';
+  const backdrop = document.getElementById('drawer-backdrop');
+  sidebar.classList.toggle('open');
+  backdrop.classList.toggle('show');
+}
+
+// ==================== 加减按钮 ====================
+function buildSteppers() {
+  document.querySelectorAll('.param-input').forEach(input => {
+    const wrap = document.createElement('div');
+    wrap.className = 'stepper';
+    input.parentNode.insertBefore(wrap, input);
+    wrap.appendChild(input);
+
+    const step = parseFloat(input.step) || 1;
+    const min = parseFloat(input.min);
+    const max = parseFloat(input.max);
+
+    const btnMinus = document.createElement('button');
+    btnMinus.className = 'stepper-btn';
+    btnMinus.textContent = '−';
+    btnMinus.type = 'button';
+    btnMinus.onclick = () => {
+      let val = parseFloat(input.value) - step;
+      if (!isNaN(min)) val = Math.max(val, min);
+      input.value = val % 1 === 0 ? val : parseFloat(val.toFixed(4));
+      input.dispatchEvent(new Event('input'));
+    };
+
+    const btnPlus = document.createElement('button');
+    btnPlus.className = 'stepper-btn';
+    btnPlus.textContent = '+';
+    btnPlus.type = 'button';
+    btnPlus.onclick = () => {
+      let val = parseFloat(input.value) + step;
+      if (!isNaN(max)) val = Math.min(val, max);
+      input.value = val % 1 === 0 ? val : parseFloat(val.toFixed(4));
+      input.dispatchEvent(new Event('input'));
+    };
+
+    wrap.appendChild(btnMinus);
+    wrap.appendChild(btnPlus);
   });
 }
 
 // ==================== 初始化 ====================
-// 移动端默认显示仿真视图
-if (window.innerWidth <= 768) {
-  mobileSwitch('sim');
-}
+buildSteppers();
 resizeCanvases();
 readParams();
 applyTheme('dark');
 resetSim();
+togglePlay();
 animId = requestAnimationFrame(animate);
 </script>
 </body>
