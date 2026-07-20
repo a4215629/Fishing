@@ -24,7 +24,7 @@
 | 浮漂阻力 Fdf | `0.5 ×  × v² × Cd_f × d_f × L_f × p × sinθ` | 水平 |
 | 鱼线阻力 Fdl | `0.5 × ρ × v² × Cd_l × d_l × L_l × sinθ` | 水平 |
 | 流体总阻力 Fd | `Fdf + Fdl` | 水平 |
-| 线张力 T | `|Fb×sinθ - Fd×cosθ|` | 沿鱼线方向 |
+| 线张力 T | `Fb×sinθ + Fd×cosθ` | 沿鱼线方向（Fb_para 与 Fd_para 同向，均使浮漂远离锚点） |
 
 ### 关键参数
 
@@ -47,7 +47,7 @@
 Fishing/
 ├── README.md                    # 项目说明
 ├── float_analysis_problem.md    # 受力分析文档（公式推导）
-├── simulation.html              # 交互式仿真页面（主程序）
+├── index.html              # 交互式仿真页面（主程序）
 ├── validate.js                  # 代码验证脚本
 ── 受力分析图.png                # 受力分析手绘图
 └── Snipaste_*.png               # 开发过程截图
@@ -55,7 +55,9 @@ Fishing/
 
 ## 使用方法
 
-直接用浏览器打开 `simulation.html`，无需任何构建工具或服务器。
+直接用浏览器打开 `index.html`，无需任何构建工具或服务器。
+
+**在线访问**：[浮漂走水受力分析仿真](https://a4215629.github.io/Fishing/)
 
 ### 功能
 

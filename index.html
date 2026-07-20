@@ -475,7 +475,14 @@ const chartCtx = chartCanvas.getContext('2d');
 
 // ==================== 读取参数 ====================
 function readParams() {
-  const g = id => parseFloat(document.getElementById(id).value);
+  // 安全读取：非法值（NaN/Infinity）时使用输入框的最小值作为默认值
+  const g = id => {
+    const v = parseFloat(document.getElementById(id).value);
+    if (!isNaN(v) && isFinite(v)) return v;
+    const el = document.getElementById(id);
+    const min = parseFloat(el.min);
+    return isNaN(min) ? 0 : min;
+  };
   params.Lf  = g('p_Lf')  * CM;
   params.md  = g('p_md')  * 0.001;
   params.df  = g('p_df')  * CM;
@@ -521,6 +528,21 @@ function computeP(theta) {
 
 /**
  * 计算各力
+ *
+ * 力分解模型（以浮漂中心为原点）：
+ *   线方向单位向量 û = (cosθ, sinθ)，指向远离锚点方向（右上）
+ *   垂直方向 n̂ = (-sinθ, cosθ)
+ *
+ *   浮力 Fb (竖直向上) 分解：
+ *     Fb_para = Fb × sinθ   → 沿 û 方向（远离锚点）
+ *     Fu      = Fb × cosθ   → 沿 n̂ 方向（使 θ 增大/浮漂上升）
+ *
+ *   流体阻力 Fd (水平向右) 分解：
+ *     Fd_para = Fd × cosθ   → 沿 û 方向（远离锚点）
+ *     Fv      = Fd × sinθ   → 沿 -n̂ 方向（使 θ 减小/浮漂下沉）
+ *
+ *   线张力 T = Fb_para + Fd_para（两分量同向，均使浮漂远离锚点）
+ *   垂直净力 F_perp = Fu - Fv（驱动浮漂角度变化的力矩源）
  */
 function computeForces(theta, p) {
   const { Lf, md, df, dl, Ll, v, Cdf, Cdl, rho } = params;
@@ -543,10 +565,10 @@ function computeForces(theta, p) {
   const Fu = Fb * cosT;    // 上升力 (垂直鱼线方向)
   const Fv = Fd * sinT;    // 下压力 (垂直鱼线方向)
 
-  // 沿鱼线方向 → 线拉力
+  // 沿鱼线方向 → 线拉力（Fb_para 和 Fd_para 同向，都使浮漂远离锚点）
   const Fb_para = Fb * sinT;
   const Fd_para = Fd * cosT;
-  const T = Math.abs(Fb_para - Fd_para);
+  const T = Fb_para + Fd_para;
 
   // 垂直鱼线方向净力 (正 = θ增大/浮漂上升)
   const F_perp = Fu - Fv;
@@ -872,6 +894,17 @@ function drawScene(forces) {
   if (forces.Fv > 1e-6) {
     const len = forces.Fv * fScale;
     arrows.push({ fx:cx, fy:cy, tx:cx + len*Math.sin(theta), ty:cy + len*Math.cos(theta), color:t.Fv, label:`Fv=${(forces.Fv*1000).toFixed(2)}`, lox:5*dpr, loy:12*dpr });
+  }
+
+  // 线张力 T：沿鱼线方向指向锚点
+  if (forces.T > 1e-6) {
+    const tLen = forces.T * fScale;
+    const tdx = anchorX - cx;
+    const tdy = anchorY - cy;
+    const tDist = Math.hypot(tdx, tdy);
+    if (tDist > 1) {
+      arrows.push({ fx:cx, fy:cy, tx:cx + tdx/tDist*tLen, ty:cy + tdy/tDist*tLen, color:t.T, label:`T=${(forces.T*1000).toFixed(2)}`, lox:-55*dpr, loy:-8*dpr });
+    }
   }
 
   // 计算缩放比例
